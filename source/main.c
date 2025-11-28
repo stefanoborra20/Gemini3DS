@@ -5,6 +5,7 @@
 #include "renderer.h"
 #include "menu.h"
 #include "mem.h"
+#include "gemini_app.h"
 #include "gemini_net.h"
 
 char currentApiKey[API_KEY_MAX_LEN] = "";
@@ -17,8 +18,9 @@ typedef enum {
 
 
 int init() {
-    R_Init();
     Net_Init();
+    R_Init();
+    GeminiApp_Init();
     return 0;
 } 
 
@@ -41,11 +43,16 @@ int main(int argc, char **argv) {
         switch (state) {
             case STATE_MENU:
                 MenuAction action = Menu_Update(kDown);
-                if (action == MENU_ACTION_GOTO_GEMINI) state = STATE_GEMINI;
+                if (action == MENU_ACTION_GOTO_GEMINI) {
+                    state = STATE_GEMINI;
+                    GeminiApp_Init();
+                }
                 else if (action == MENU_ACTION_GOTO_APIKEY) state = STATE_APIKEY; 
                 break;
             case STATE_GEMINI:
+                GeminiApp_Update(kDown, currentApiKey);
 
+                if (kDown & KEY_B) state = STATE_MENU;
                 break;
             case STATE_APIKEY: 
                 if (kDown & KEY_B) {
@@ -82,6 +89,9 @@ int main(int argc, char **argv) {
                 R_DrawText(10, 100, "[A] Edit", COLOR_TEXT_NORMAL);
                 R_DrawText(10, 130, "[B] Back", COLOR_TEXT_NORMAL);
                 break;                
+            case STATE_GEMINI:
+                GeminiApp_Draw();
+                break;
         }
 
         R_EndFrame();

@@ -88,6 +88,7 @@ main.o: /home/stefano/Documents/Gemini3DS/source/main.c \
  /home/stefano/Documents/Gemini3DS/include/renderer.h \
  /home/stefano/Documents/Gemini3DS/include/menu.h \
  /home/stefano/Documents/Gemini3DS/include/mem.h \
+ /home/stefano/Documents/Gemini3DS/include/gemini_app.h \
  /home/stefano/Documents/Gemini3DS/include/gemini_net.h
 /opt/devkitpro/libctru/include/3ds.h:
 /opt/devkitpro/libctru/include/3ds/types.h:
@@ -178,4 +179,5 @@ main.o: /home/stefano/Documents/Gemini3DS/source/main.c \
 /home/stefano/Documents/Gemini3DS/include/renderer.h:
 /home/stefano/Documents/Gemini3DS/include/menu.h:
 /home/stefano/Documents/Gemini3DS/include/mem.h:
+/home/stefano/Documents/Gemini3DS/include/gemini_app.h:
 /home/stefano/Documents/Gemini3DS/include/gemini_net.h:
