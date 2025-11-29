@@ -1,4 +1,6 @@
 #include "renderer.h"
+#include <stdlib.h>
+#include <string.h>
 #include <citro2d.h>
 
 static C3D_RenderTarget *topTarget;
@@ -70,10 +72,42 @@ void R_ClearScreen(TargetScreen screen, Color color) {
 
 void R_DrawText(float x, float y, const char *text, Color color) {
     C2D_Text txt;
-//    C2D_TextParse(&txt, staticTextBuf, text);
     C2D_TextFontParse(&txt, sysFont, staticTextBuf, text);
     C2D_TextOptimize(&txt);
     C2D_DrawText(&txt, C2D_WithColor, x, y, 0.5f, 1.0f, 1.0f, getColor(color));
+}
+
+/* Does not work properly, maybe is how the json file is formatted */
+void R_DrawTextWrapped(float x, float y, float widthLimit, const char *text, Color color) {
+    C2D_Text word;
+    float cursorX = x;
+    float cursorY = y; 
+    char *strCpy = strdup(text); 
+    char *token;
+    float wordWidth; 
+    float wordHeight;
+
+    C2D_Text space;
+    float spaceWidth;
+    C2D_TextFontParse(&space, sysFont, staticTextBuf, " ");
+    C2D_TextOptimize(&space);
+    C2D_TextGetDimensions(&space, 0.5f, 0.5, &spaceWidth, NULL);
+    
+    while ((token = strtok_r(strCpy, " ", &strCpy))) {
+        C2D_TextFontParse(&word, sysFont, staticTextBuf, token);
+        C2D_TextOptimize(&word);
+        C2D_TextGetDimensions(&word, 0.5f, 0.5f, &wordWidth, &wordHeight);
+        
+        if (cursorX + wordWidth > x + widthLimit) {
+            cursorX = x;        
+            cursorY += wordHeight + 2.0f;
+        } 
+
+        C2D_DrawText(&word, C2D_WithColor, cursorX, cursorY, 0.5f, 0.5f, 0.5f, getColor(color));
+
+        cursorX += wordWidth + spaceWidth;
+    }
+    free(strCpy);
 }
 
 bool R_OpenKeyboard(const char *hintText, char *outputBuffer, size_t maxLen) {

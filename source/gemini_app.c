@@ -4,7 +4,8 @@
 #include <string.h>
 #include <stdio.h>
 
-#define MAX_RESPONSE_LEN 2048
+//#define MAX_RESPONSE_LEN 2048
+#define MAX_RESPONSE_LEN 8192
 #define MAX_PROMT_LEN 256
 
 static char responseText[MAX_RESPONSE_LEN];
@@ -43,9 +44,7 @@ void GeminiApp_Draw() {
     R_SetTarget(SCREEN_TOP);
     R_ClearScreen(SCREEN_TOP, COLOR_BACKGROUND);
 
-    // Need to "cap" this so that the text does not go
-    // over the sreen
-    R_DrawText(10, 10, responseText, COLOR_TEXT_NORMAL);
+    R_DrawTextWrapped(0, 0, SCREEN_TOP_WIDTH, responseText, COLOR_TEXT_NORMAL); 
 
     // Bottom screen
     R_SetTarget(SCREEN_BOTTOM);
