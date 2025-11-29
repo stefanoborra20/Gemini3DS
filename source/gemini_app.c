@@ -43,6 +43,8 @@ void GeminiApp_Draw() {
     R_SetTarget(SCREEN_TOP);
     R_ClearScreen(SCREEN_TOP, COLOR_BACKGROUND);
 
+    // Need to "cap" this so that the text does not go
+    // over the sreen
     R_DrawText(10, 10, responseText, COLOR_TEXT_NORMAL);
 
     // Bottom screen

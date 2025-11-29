@@ -17,20 +17,32 @@ static u32 getColor(Color color) {
 }
 
 void R_Init() {
+    Result rc = romfsInit();
+    if (R_FAILED(rc)) {
+        printf("romfsInit() Failed\n");
+    }
+
     gfxInitDefault();
+    cfguInit();
     C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
     C2D_Init(C2D_DEFAULT_MAX_OBJECTS);
     C2D_Prepare();
 
     topTarget = C2D_CreateScreenTarget(GFX_TOP, GFX_LEFT);
     bottomTarget = C2D_CreateScreenTarget(GFX_BOTTOM, GFX_LEFT);
-    sysFont = C2D_FontLoadSystem(CFG_REGION_EUR);
+
+    sysFont = C2D_FontLoad("romfs:/boldpixels.bcfnt");
+    if (sysFont == NULL) {
+        sysFont = C2D_FontLoadSystem(CFG_REGION_EUR);
+    }
     staticTextBuf = C2D_TextBufNew(4096);
 }
 
 void R_Exit() {
     C2D_TextBufDelete(staticTextBuf);
     C2D_FontFree(sysFont);
+    romfsExit();
+    cfguExit();
     C2D_Fini();
     C3D_Fini();
     gfxExit();
@@ -58,7 +70,8 @@ void R_ClearScreen(TargetScreen screen, Color color) {
 
 void R_DrawText(float x, float y, const char *text, Color color) {
     C2D_Text txt;
-    C2D_TextParse(&txt, staticTextBuf, text);
+//    C2D_TextParse(&txt, staticTextBuf, text);
+    C2D_TextFontParse(&txt, sysFont, staticTextBuf, text);
     C2D_TextOptimize(&txt);
     C2D_DrawText(&txt, C2D_WithColor, x, y, 0.5f, 1.0f, 1.0f, getColor(color));
 }
