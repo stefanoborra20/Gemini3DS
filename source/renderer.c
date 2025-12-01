@@ -14,6 +14,7 @@ static u32 getColor(Color color) {
         case COLOR_TEXT_NORMAL: return C2D_Color32(0x33, 0xFF, 0x33, 0xFF); // green
         case COLOR_TEXT_HIGHLIGHT: return C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF);
         case COLOR_CURSOR: return C2D_Color32(0x33, 0xFF, 0x33, 0xFF);
+        case COLOR_SCROLL_BAR: return C2D_Color32(0x64, 0x64, 0x64, 0xFF);
         default: return C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF);
     }
 }
@@ -78,7 +79,7 @@ void R_DrawText(float x, float y, const char *text, Color color) {
 }
 
 /* Does not work properly, maybe is how the json file is formatted */
-void R_DrawTextWrapped(float x, float y, float widthLimit, const char *text, Color color) {
+void R_DrawTextWrapped(float x, float y, float widthLimit, const char *text, Color color, float *totalTextHeight) {
     C2D_Text word;
     float cursorX = x;
     float cursorY = y; 
@@ -108,6 +109,12 @@ void R_DrawTextWrapped(float x, float y, float widthLimit, const char *text, Col
         cursorX += wordWidth + spaceWidth;
     }
     free(strCpy);
+
+    if (totalTextHeight != NULL) *totalTextHeight = (cursorY - y) + wordHeight;
+}
+
+void R_DrawRectSolid(float x, float y, float z, float width, float height, Color color) {
+    C2D_DrawRectSolid(x, y, z, width, height, getColor(color));
 }
 
 bool R_OpenKeyboard(const char *hintText, char *outputBuffer, size_t maxLen) {

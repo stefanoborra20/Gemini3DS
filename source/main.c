@@ -84,7 +84,7 @@ int main(int argc, char **argv) {
                 R_ClearScreen(SCREEN_BOTTOM, COLOR_BACKGROUND);
                 R_DrawText(10, 10, "Saved Api Key", COLOR_TEXT_NORMAL);
 
-                R_DrawText(10, 40, currentApiKey, COLOR_TEXT_HIGHLIGHT);
+                R_DrawTextWrapped(10, 40, 380.0f, currentApiKey, COLOR_TEXT_HIGHLIGHT, NULL);
                 
                 R_DrawText(10, 100, "[A] Edit", COLOR_TEXT_NORMAL);
                 R_DrawText(10, 130, "[B] Back", COLOR_TEXT_NORMAL);
