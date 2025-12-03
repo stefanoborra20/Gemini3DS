@@ -46,7 +46,26 @@ bool Net_QueryGemini(const char *apiKey, const char *promt, char *responseBuffer
     json_t *content_obj = json_object();
     json_t *parts = json_array();
     json_t *part_obj = json_object();
+    
+    json_t *sys_inst = json_object();
+    json_t *sys_parts = json_array();
+    json_t *sys_part = json_object();
+    
+    // SYSTEM INSTRUCTIONS 
+    const char *rules = "You are a text-only terminal assistant."
+        "Return strict plain text. Do NOT use markdown formatting.";
 
+    json_object_set_new(sys_part, "text", json_string(rules));
+    json_array_append(sys_parts, sys_part);
+    json_object_set_new(sys_inst, "parts", sys_parts);
+    json_object_set_new(root, "systemInstruction", sys_inst);
+    
+    // GENERATION CONFIG 
+    json_t *gen_config = json_object();
+    json_object_set_new(gen_config, "responseMimeType", json_string("text/plain"));
+    json_object_set_new(root, "generationConfig", gen_config);
+
+    // USER REQUEST
     json_object_set_new(part_obj, "text", json_string(promt));
     json_array_append_new(parts, part_obj);
     json_object_set_new(content_obj, "parts", parts);
