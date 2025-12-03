@@ -64,7 +64,7 @@ void GeminiApp_Draw() {
 
     float startY = 10.0f;
     float drawY = startY - scrollY;
-    R_DrawTextWrapped(10.0f, drawY, SCREEN_TOP_WIDTH, responseText, COLOR_TEXT_NORMAL, &totalTextHeight); 
+    R_DrawTextWrapped(10.0f, drawY, SCREEN_TOP_WIDTH - 20.0f, responseText, COLOR_TEXT_NORMAL, &totalTextHeight); 
 
     // Draw side bar
     if (totalTextHeight > SCREEN_TOP_HEIGHT) {
