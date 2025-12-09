@@ -1,5 +1,5 @@
-gemini_app.o: /home/stefano/Documents/Gemini3DS/source/gemini_app.c \
- /home/stefano/Documents/Gemini3DS/include/gemini_app.h \
+gemini_app.o: /home/stefano/Documents/git/Gemini3DS/source/gemini_app.c \
+ /home/stefano/Documents/git/Gemini3DS/include/gemini_app.h \
  /opt/devkitpro/libctru/include/3ds.h \
  /opt/devkitpro/libctru/include/3ds/types.h \
  /opt/devkitpro/libctru/include/3ds/result.h \
@@ -86,9 +86,9 @@ gemini_app.o: /home/stefano/Documents/Gemini3DS/source/gemini_app.c \
  /opt/devkitpro/libctru/include/3ds/font.h \
  /opt/devkitpro/libctru/include/3ds/gdbhio_dev.h \
  /opt/devkitpro/libctru/include/3ds/3dslink.h \
- /home/stefano/Documents/Gemini3DS/include/gemini_net.h \
- /home/stefano/Documents/Gemini3DS/include/renderer.h
-/home/stefano/Documents/Gemini3DS/include/gemini_app.h:
+ /home/stefano/Documents/git/Gemini3DS/include/gemini_net.h \
+ /home/stefano/Documents/git/Gemini3DS/include/renderer.h
+/home/stefano/Documents/git/Gemini3DS/include/gemini_app.h:
 /opt/devkitpro/libctru/include/3ds.h:
 /opt/devkitpro/libctru/include/3ds/types.h:
 /opt/devkitpro/libctru/include/3ds/result.h:
@@ -175,5 +175,5 @@ gemini_app.o: /home/stefano/Documents/Gemini3DS/source/gemini_app.c \
 /opt/devkitpro/libctru/include/3ds/font.h:
 /opt/devkitpro/libctru/include/3ds/gdbhio_dev.h:
 /opt/devkitpro/libctru/include/3ds/3dslink.h:
-/home/stefano/Documents/Gemini3DS/include/gemini_net.h:
-/home/stefano/Documents/Gemini3DS/include/renderer.h:
+/home/stefano/Documents/git/Gemini3DS/include/gemini_net.h:
+/home/stefano/Documents/git/Gemini3DS/include/renderer.h:

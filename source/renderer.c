@@ -78,39 +78,79 @@ void R_DrawText(float x, float y, const char *text, Color color) {
     C2D_DrawText(&txt, C2D_WithColor, x, y, 0.5f, 1.0f, 1.0f, getColor(color));
 }
 
-/* Does not work properly, maybe is how the json file is formatted */
+
+void R_ClearText(char *text) {
+    char *src = text;
+    char *dst = text;
+
+    while (*src) {
+        char c = *src;
+        // Markdown symbols
+        if (c == '`' ||
+            c == '*' ||
+            c == '#' ||
+            c == '_' ||
+            c == '~' ||
+            c == '>' ||
+            c == '[' ||
+            c == ']') {
+            src++;
+            continue;
+        }
+
+        // Indentation symbols
+        if (*src == '\n' || *src == '\t' || *src == '\r') {
+            *dst = ' ';
+            dst++;
+            src++;
+            continue;;
+        }
+
+        *dst = c;
+        dst++;
+        src++;
+    }
+    *dst = '\0';
+}
+
 void R_DrawTextWrapped(float x, float y, float widthLimit, const char *text, Color color, float *totalTextHeight) {
     C2D_Text word;
-    float cursorX = x;
-    float cursorY = y; 
-    char *strCpy = strdup(text); 
-    char *token;
-    float wordWidth; 
-    float wordHeight;
+    float cursorX = x, cursorY = y;
+
+    char *textCpy = strdup(text);
+    float wordWidth, wordHeight, currentLineMaxHeight = 0.0f;
 
     C2D_Text space;
     float spaceWidth;
     C2D_TextFontParse(&space, sysFont, staticTextBuf, " ");
     C2D_TextOptimize(&space);
-    C2D_TextGetDimensions(&space, 0.5f, 0.5, &spaceWidth, NULL);
+    C2D_TextGetDimensions(&space, 1.0f, 1.0f, &spaceWidth, NULL);
     
-    while ((token = strtok_r(strCpy, " ", &strCpy))) {
+    char *parsePtr = textCpy;
+    char *savePtr;
+    char *token;
+    while ((token = strtok_r(parsePtr, " ", &savePtr))) {
+        parsePtr = NULL;
+
         C2D_TextFontParse(&word, sysFont, staticTextBuf, token);
         C2D_TextOptimize(&word);
-        C2D_TextGetDimensions(&word, 0.5f, 0.5f, &wordWidth, &wordHeight);
-        
+        C2D_TextGetDimensions(&word, 1.0f, 1.0f, &wordWidth, &wordHeight);
+
+        if (wordHeight > currentLineMaxHeight) {
+            currentLineMaxHeight = wordHeight;
+        }
         if (cursorX + wordWidth > x + widthLimit) {
-            cursorX = x;        
-            cursorY += wordHeight + 2.0f;
-        } 
+            cursorX = x;
 
-        C2D_DrawText(&word, C2D_WithColor, cursorX, cursorY, 0.5f, 0.5f, 0.5f, getColor(color));
+            cursorY += (currentLineMaxHeight > 0) ? currentLineMaxHeight : wordHeight;
+        }
 
+        C2D_DrawText(&word, C2D_WithColor, cursorX, cursorY, 1.0f, 1.0f, 1.0f, getColor(color));
         cursorX += wordWidth + spaceWidth;
-    }
-    free(strCpy);
 
-    if (totalTextHeight != NULL) *totalTextHeight = (cursorY - y) + wordHeight;
+    } 
+    free(textCpy);
+    if (totalTextHeight != NULL) *totalTextHeight = (cursorY - y) + currentLineMaxHeight;
 }
 
 void R_DrawRectSolid(float x, float y, float z, float width, float height, Color color) {

@@ -1,5 +1,5 @@
-menu.o: /home/stefano/Documents/Gemini3DS/source/menu.c \
- /home/stefano/Documents/Gemini3DS/include/menu.h \
+menu.o: /home/stefano/Documents/git/Gemini3DS/source/menu.c \
+ /home/stefano/Documents/git/Gemini3DS/include/menu.h \
  /opt/devkitpro/libctru/include/3ds.h \
  /opt/devkitpro/libctru/include/3ds/types.h \
  /opt/devkitpro/libctru/include/3ds/result.h \
@@ -86,8 +86,8 @@ menu.o: /home/stefano/Documents/Gemini3DS/source/menu.c \
  /opt/devkitpro/libctru/include/3ds/font.h \
  /opt/devkitpro/libctru/include/3ds/gdbhio_dev.h \
  /opt/devkitpro/libctru/include/3ds/3dslink.h \
- /home/stefano/Documents/Gemini3DS/include/renderer.h
-/home/stefano/Documents/Gemini3DS/include/menu.h:
+ /home/stefano/Documents/git/Gemini3DS/include/renderer.h
+/home/stefano/Documents/git/Gemini3DS/include/menu.h:
 /opt/devkitpro/libctru/include/3ds.h:
 /opt/devkitpro/libctru/include/3ds/types.h:
 /opt/devkitpro/libctru/include/3ds/result.h:
@@ -174,4 +174,4 @@ menu.o: /home/stefano/Documents/Gemini3DS/source/menu.c \
 /opt/devkitpro/libctru/include/3ds/font.h:
 /opt/devkitpro/libctru/include/3ds/gdbhio_dev.h:
 /opt/devkitpro/libctru/include/3ds/3dslink.h:
-/home/stefano/Documents/Gemini3DS/include/renderer.h:
+/home/stefano/Documents/git/Gemini3DS/include/renderer.h:

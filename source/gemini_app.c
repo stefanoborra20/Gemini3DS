@@ -51,7 +51,7 @@ void GeminiApp_Update(u32 kDown, const char *apiKey) {
             R_EndFrame();
 
             Net_QueryGemini(apiKey, promtBuffer, responseText, MAX_RESPONSE_LEN);
-
+            R_ClearText(responseText);
             isThinking = false;
         }
     }
@@ -84,9 +84,5 @@ void GeminiApp_Draw() {
     R_DrawText(10, 10, "Commands:", COLOR_TEXT_HIGHLIGHT);
     R_DrawText(10, 40, "[A] New Promt", COLOR_TEXT_NORMAL);
     R_DrawText(10, 60, "[B] Back", COLOR_TEXT_NORMAL);
-   
-    if (isThinking) {
-        R_DrawText(10, 150, "Loading...", COLOR_TEXT_HIGHLIGHT);
-    } 
-
 }
+

@@ -29,6 +29,10 @@ void R_SetTarget(TargetScreen);
 
 void R_ClearScreen(TargetScreen, Color);
 
+/* This function aims to remove every markdown or indenting symbol
+ * from the given text */
+void R_ClearText(char *text);
+
 void R_DrawText(float x, float y, const char *text, Color color);
 void R_DrawTextWrapped(float x, float y, float widthLimit, const char *text, Color color, float *totalTextHeight);
 void R_DrawRectSolid(float x, float y, float z, float width, float height, Color color);

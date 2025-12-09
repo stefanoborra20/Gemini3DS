@@ -1,5 +1,5 @@
-gemini_net.o: /home/stefano/Documents/Gemini3DS/source/gemini_net.c \
- /home/stefano/Documents/Gemini3DS/include/gemini_net.h \
+gemini_net.o: /home/stefano/Documents/git/Gemini3DS/source/gemini_net.c \
+ /home/stefano/Documents/git/Gemini3DS/include/gemini_net.h \
  /opt/devkitpro/libctru/include/3ds.h \
  /opt/devkitpro/libctru/include/3ds/types.h \
  /opt/devkitpro/libctru/include/3ds/result.h \
@@ -99,7 +99,7 @@ gemini_net.o: /home/stefano/Documents/Gemini3DS/source/gemini_net.c \
  /opt/devkitpro/portlibs/3ds/include/curl/typecheck-gcc.h \
  /opt/devkitpro/portlibs/3ds/include/jansson.h \
  /opt/devkitpro/portlibs/3ds/include/jansson_config.h
-/home/stefano/Documents/Gemini3DS/include/gemini_net.h:
+/home/stefano/Documents/git/Gemini3DS/include/gemini_net.h:
 /opt/devkitpro/libctru/include/3ds.h:
 /opt/devkitpro/libctru/include/3ds/types.h:
 /opt/devkitpro/libctru/include/3ds/result.h:
