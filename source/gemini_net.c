@@ -46,7 +46,8 @@ bool Net_QueryGemini(const char *apiKey, const char *promt, char *responseBuffer
     json_t *content_obj = json_object();
     json_t *parts = json_array();
     json_t *part_obj = json_object();
-
+    
+    // USER REQUEST
     json_object_set_new(part_obj, "text", json_string(promt));
     json_array_append_new(parts, part_obj);
     json_object_set_new(content_obj, "parts", parts);
@@ -97,7 +98,6 @@ bool Net_QueryGemini(const char *apiKey, const char *promt, char *responseBuffer
                 const char *text_content = json_string_value(text_obj);
 
                 if (text_content) {
-                    // copy clean text in buffer
                     char temp[bufferSize];
                     strncpy(temp, text_content, bufferSize);
                     strncpy(responseBuffer, temp, bufferSize);
