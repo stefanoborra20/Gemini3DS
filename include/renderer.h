@@ -33,7 +33,7 @@ void R_ClearScreen(TargetScreen, Color);
  * from the given text */
 void R_ClearText(char *text);
 
-void R_DrawText(float x, float y, const char *text, Color color);
+void R_DrawText(float x, float y, float scale, const char *text, Color color);
 void R_DrawTextWrapped(float x, float y, float widthLimit, const char *text, Color color, float *totalTextHeight);
 void R_DrawRectSolid(float x, float y, float z, float width, float height, Color color);
 

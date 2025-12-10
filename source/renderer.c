@@ -71,11 +71,12 @@ void R_ClearScreen(TargetScreen screen, Color color) {
     else C2D_TargetClear(bottomTarget, getColor(color));
 }
 
-void R_DrawText(float x, float y, const char *text, Color color) {
+void R_DrawText(float x, float y, float scale, const char *text, Color color) {
+    if (scale <= 0) scale = 1.0f;
     C2D_Text txt;
     C2D_TextFontParse(&txt, sysFont, staticTextBuf, text);
     C2D_TextOptimize(&txt);
-    C2D_DrawText(&txt, C2D_WithColor, x, y, 0.5f, 1.0f, 1.0f, getColor(color));
+    C2D_DrawText(&txt, C2D_WithColor, x, y, 0.5f, scale, scale, getColor(color));
 }
 
 
