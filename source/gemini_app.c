@@ -47,7 +47,7 @@ void GeminiApp_Update(u32 kDown, const char *apiKey) {
             R_BeginFrame();
             R_SetTarget(SCREEN_TOP);
             R_ClearScreen(SCREEN_TOP, COLOR_BACKGROUND);
-            R_DrawText(10, 10, "Gemini is thinking...", COLOR_TEXT_HIGHLIGHT);
+            R_DrawText(10, 10, 1, "Gemini is thinking...", COLOR_TEXT_HIGHLIGHT);
             R_EndFrame();
 
             Net_QueryGemini(apiKey, promtBuffer, responseText, MAX_RESPONSE_LEN);
@@ -81,8 +81,8 @@ void GeminiApp_Draw() {
     R_SetTarget(SCREEN_BOTTOM);
     R_ClearScreen(SCREEN_BOTTOM, COLOR_BACKGROUND);
     
-    R_DrawText(10, 10, "Commands:", COLOR_TEXT_HIGHLIGHT);
-    R_DrawText(10, 40, "[A] New Promt", COLOR_TEXT_NORMAL);
-    R_DrawText(10, 60, "[B] Back", COLOR_TEXT_NORMAL);
+    R_DrawText(10, 10, 1, "Commands:", COLOR_TEXT_HIGHLIGHT);
+    R_DrawText(10, 40, 1, "[A] New Promt", COLOR_TEXT_NORMAL);
+    R_DrawText(10, 60, 1, "[B] Back", COLOR_TEXT_NORMAL);
 }
 
