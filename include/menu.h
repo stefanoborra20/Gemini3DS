@@ -6,7 +6,8 @@
 typedef enum {
     MENU_ACTION_NONE,
     MENU_ACTION_GOTO_GEMINI,
-    MENU_ACTION_GOTO_APIKEY
+    MENU_ACTION_GOTO_APIKEY,
+    MENU_ACTION_GOTO_SETTINGS
 } MenuAction;
 
 void Menu_Init();

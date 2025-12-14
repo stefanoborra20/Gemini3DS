@@ -7,19 +7,22 @@
 #include "mem.h"
 #include "gemini_app.h"
 #include "gemini_net.h"
+#include "settings.h"
 
 char currentApiKey[API_KEY_MAX_LEN] = "";
 
 typedef enum {
     STATE_MENU,
     STATE_GEMINI,
-    STATE_APIKEY
+    STATE_APIKEY,
+    STATE_SETTINGS
 } State;
 
 
 int init() {
     Net_Init();
     R_Init();
+    Settings_Init();
     GeminiApp_Init();
     return 0;
 } 
@@ -47,7 +50,12 @@ int main(int argc, char **argv) {
                     state = STATE_GEMINI;
                     GeminiApp_Init();
                 }
-                else if (action == MENU_ACTION_GOTO_APIKEY) state = STATE_APIKEY; 
+                else if (action == MENU_ACTION_GOTO_APIKEY) {
+                    state = STATE_APIKEY; 
+                } 
+                else if (action == MENU_ACTION_GOTO_SETTINGS) {
+                    state = STATE_SETTINGS;
+                }
                 break;
             case STATE_GEMINI:
                 GeminiApp_Update(kDown, currentApiKey);
@@ -67,6 +75,13 @@ int main(int argc, char **argv) {
                         strncpy(currentApiKey, tempBuffer, API_KEY_MAX_LEN);
                         Mem_SaveApiKey(currentApiKey);
                     }
+                } 
+                break;
+            case STATE_SETTINGS:
+                Settings_Update(kDown); 
+
+                if (kDown & KEY_B) {
+                    state = STATE_MENU;
                 } 
                 break;
 
@@ -91,6 +106,9 @@ int main(int argc, char **argv) {
                 break;                
             case STATE_GEMINI:
                 GeminiApp_Draw();
+                break;
+            case STATE_SETTINGS:
+                Settings_Draw();
                 break;
         }
 

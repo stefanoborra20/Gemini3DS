@@ -25,16 +25,19 @@ MenuAction Menu_Update(u32 kDown) {
     if (kDown & KEY_A) {
         if (selectedOption == 0) return MENU_ACTION_GOTO_GEMINI;
         if (selectedOption == 1) return MENU_ACTION_GOTO_APIKEY;
+        if (selectedOption == 2) return MENU_ACTION_GOTO_SETTINGS;
     }
     return MENU_ACTION_NONE;
 }
 
 void Menu_Draw() {
+    // Screens Clear
     R_SetTarget(SCREEN_BOTTOM);
     R_ClearScreen(SCREEN_BOTTOM, COLOR_BACKGROUND);
     R_SetTarget(SCREEN_TOP);
     R_ClearScreen(SCREEN_TOP, COLOR_BACKGROUND);
 
+    /* Top Screen */
     float startX = SCREEN_TOP_WIDTH / 2 - 50.0f; 
     float startY = SCREEN_TOP_HEIGHT / 2 - 20.0f; 
     float lineSpacing = 30.0f;
@@ -50,6 +53,6 @@ void Menu_Draw() {
         } else {
             R_DrawText(startX, y, 1, options[i], COLOR_TEXT_NORMAL);
         }
-    }
-    
+    }  
 }
+
