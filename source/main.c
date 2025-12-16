@@ -10,6 +10,7 @@
 #include "settings.h"
 
 char currentApiKey[API_KEY_MAX_LEN] = "";
+bool printApiKeyErr = false;
 
 typedef enum {
     STATE_MENU,
@@ -47,8 +48,13 @@ int main(int argc, char **argv) {
             case STATE_MENU:
                 MenuAction action = Menu_Update(kDown);
                 if (action == MENU_ACTION_GOTO_GEMINI) {
-                    state = STATE_GEMINI;
-                    GeminiApp_Init();
+                    // Check if Api Key was inserted
+                    if (strcmp(currentApiKey, "") != 0) {
+                        state = STATE_GEMINI;
+                        GeminiApp_Init();
+                    } else {
+                        printApiKeyErr = true;
+                    }
                 }
                 else if (action == MENU_ACTION_GOTO_APIKEY) {
                     state = STATE_APIKEY; 
@@ -74,6 +80,7 @@ int main(int argc, char **argv) {
                     if (R_OpenKeyboard("Insert your Gemini API Key", tempBuffer, API_KEY_MAX_LEN)) {
                         strncpy(currentApiKey, tempBuffer, API_KEY_MAX_LEN);
                         Mem_SaveApiKey(currentApiKey);
+                        if (printApiKeyErr) printApiKeyErr = false;
                     }
                 } 
                 break;
@@ -93,13 +100,18 @@ int main(int argc, char **argv) {
         switch (state) {
             case STATE_MENU:
                 Menu_Draw();
+
+                if (printApiKeyErr) {
+                    R_SetTarget(SCREEN_BOTTOM);
+                    R_DrawText(10, 5, 1, "No api key inserted", COLOR_TEXT_HIGHLIGHT);
+                }
                 break;
             case STATE_APIKEY:
                 R_SetTarget(SCREEN_BOTTOM);
                 R_ClearScreen(SCREEN_BOTTOM, COLOR_BACKGROUND);
                 R_DrawText(10, 10, 1, "Saved Api Key", COLOR_TEXT_NORMAL);
 
-                R_DrawText(10, 10, 0.5f, currentApiKey, COLOR_TEXT_HIGHLIGHT);
+                R_DrawText(10, 40, 0.5f, currentApiKey, COLOR_TEXT_HIGHLIGHT);
                 
                 R_DrawText(10, 100, 1, "[A] Edit", COLOR_TEXT_NORMAL);
                 R_DrawText(10, 130, 1, "[B] Back", COLOR_TEXT_NORMAL);

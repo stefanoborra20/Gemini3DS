@@ -39,7 +39,10 @@ INCLUDES	:=	include
 GRAPHICS	:=	gfx
 GFXBUILD	:=	$(BUILD)
 ROMFS		:=	romfs
-#GFXBUILD	:=	$(ROMFS)/gfx
+
+APP_TITLE 		:= Gemini3DS
+APP_AUTHOR		:= stefanoborra20 
+APP_DESCRIPTION := Retro-styled Gemini client
 
 #---------------------------------------------------------------------------------
 # options for code generation
