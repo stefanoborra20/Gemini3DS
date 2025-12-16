@@ -18,6 +18,7 @@ typedef enum {
 
 struct SettingOption {
     const char *label;
+    const char **description;
 
     union {
         int iVal;

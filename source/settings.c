@@ -19,11 +19,17 @@ const static char *API_MODEL_IDS[] = {
     "gemini-2.5-flash-lite",
 };
 
+const static char *settingDescriptions[] = {
+    "Please note that some models featured here may be discontinued.",
+    "Control response creativity. The higher the more creative.",
+    "Maximum generated token limit. Note that one token not always equals to one word.",
+};
+
 static SettingOption settings[] = {
-    /* Label             {.actual Value}          {min, max, step}     toStringFunc   onEditFun*/
-    {"Model: ",          {.iVal=MODEL_2_5_FLASH}, {0, MODEL_COUNT-1, 1}, ModelToString, EditCycle},
-    {"Temperature: ",    {.fVal=1.0f},            {0.0f, 2.0f, 0.1f},    FloatToString, EditFloat},
-    {"Max Tokens: ",     {.iVal=100},             {100, 1000, 1},        IntToString,   EditInt}
+    /* Label          Description                            {.actual Value}          {min, max, step}       toStringFunc   onEditFun*/
+    {"Model: ",       &settingDescriptions[OPT_MODEL],       {.iVal=MODEL_2_5_FLASH}, {0, MODEL_COUNT-1, 1}, ModelToString, EditCycle},
+    {"Temperature: ", &settingDescriptions[OPT_TEMPERATURE], {.fVal=1.0f},            {0.0f, 2.0f, 0.1f},    FloatToString, EditFloat},
+    {"Max Tokens: ",  &settingDescriptions[OPT_MAXTOKENS],   {.iVal=100},             {100, 1000, 1},        IntToString,   EditInt}
 };
 
 #define OPTION_COUNT sizeof(settings) / sizeof(SettingOption)
@@ -126,7 +132,14 @@ void Settings_Draw() {
     }
 
     /* Bottom Screen */
-    // TODO Add description for each option 
+    R_SetTarget(SCREEN_BOTTOM);
+    R_ClearScreen(SCREEN_BOTTOM, COLOR_BACKGROUND);
+    
+    // Commands
+    R_DrawText(5, 5, 1, "-> <- Modify", COLOR_TEXT_NORMAL); 
+    
+    // Description 
+    R_DrawTextWrapped(5, 40, SCREEN_BOTTOM_WIDTH, *settings[cursor].description, COLOR_TEXT_NORMAL, NULL);
 }
 
 const char* Settings_GetModel() {
