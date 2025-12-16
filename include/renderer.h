@@ -4,7 +4,7 @@
 #include <3ds.h>
 #define SCREEN_TOP_WIDTH 400
 #define SCREEN_TOP_HEIGHT 240
-#define SCREEN_BOTTOM_WIDTH 340
+#define SCREEN_BOTTOM_WIDTH 320
 
 typedef enum {
     COLOR_BACKGROUND=0,

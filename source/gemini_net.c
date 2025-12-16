@@ -8,7 +8,6 @@
 
 #define SOC_ALIGN 0x1000
 #define SOC_BUFFER_SIZE 0x100000
-#define GEMINI_ENDPOINT "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
 static u32* socBuffer = NULL;
 
@@ -40,24 +39,40 @@ bool Net_QueryGemini(const char *apiKey, const char *promt, char *responseBuffer
     CURL *curl;
     CURLcode res;
     bool success = false;
-    
+
+    /* --- Build Json --- */
     json_t *root = json_object();
     json_t *contents = json_array();
     json_t *content_obj = json_object();
     json_t *parts = json_array();
     json_t *part_obj = json_object();
     
-    // USER REQUEST
+    /* --- User content --- */
     json_object_set_new(part_obj, "text", json_string(promt));
     json_array_append_new(parts, part_obj);
     json_object_set_new(content_obj, "parts", parts);
     json_array_append_new(contents, content_obj);
     json_object_set_new(root, "contents", contents);
 
+    /* --- Config --- */
+    json_t *gen_config = json_object();
+    float temp = Settings_GetTemperature();
+    int max_tokens = Settings_GetMaxTokens();
+    
+    json_object_set_new(gen_config, "temperature", json_real(temp));
+    json_object_set_new(gen_config, "maxOutputTokens", json_integer(max_tokens));
+
+    /* Attach config to root */
+    json_object_set_new(root, "generationConfig", gen_config);
+
     char *json_body = json_dumps(root, 0);
 
+    // Build URL
     char url[512];
-    snprintf(url, sizeof(url), "%s?key=%s", GEMINI_ENDPOINT, apiKey);
+    snprintf(url, sizeof(url),
+           "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
+           Settings_GetModel(),
+           apiKey);
 
     curl = curl_easy_init();
     if (curl) {
@@ -78,12 +93,21 @@ bool Net_QueryGemini(const char *apiKey, const char *promt, char *responseBuffer
         // Disable SSL
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-
+        
+        // Send Request
         res = curl_easy_perform(curl);
+        long http_code = 0;
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
         if (res != CURLE_OK) {
             snprintf(responseBuffer, bufferSize, "Curl Error:%s", curl_easy_strerror(res));
+        } else if (http_code != 200) {
+            char raw_err[128];
+            strncpy(raw_err, responseBuffer, 127);
+            raw_err[127] = '\0';
+            snprintf(responseBuffer, bufferSize, "HTTP: %ld Err: %.100s", http_code, raw_err);
         } else {
-            // JSON parsing
+            // HTTP OK
             json_error_t error;
             json_t *resp_root = json_loads(responseBuffer, 0, &error);
 
