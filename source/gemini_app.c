@@ -81,8 +81,7 @@ void GeminiApp_Draw() {
     R_SetTarget(SCREEN_BOTTOM);
     R_ClearScreen(SCREEN_BOTTOM, COLOR_BACKGROUND);
     
-    R_DrawText(10, 10, 1, "Commands:", COLOR_TEXT_HIGHLIGHT);
-    R_DrawText(10, 40, 1, "[A] New Promt", COLOR_TEXT_NORMAL);
-    R_DrawText(10, 60, 1, "[B] Back", COLOR_TEXT_NORMAL);
+    R_DrawText(10, 5, 1, "[A] New Promt", COLOR_TEXT_NORMAL);
+    R_DrawText(10, 35, 1, "[B] Back", COLOR_TEXT_NORMAL);
 }
 

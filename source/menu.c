@@ -5,7 +5,7 @@
 
 // Logo will be replaced with some ASCII art
 const char *logo = 
-    "======      GEMINI - 3DS    ======";
+    "< GEMINI-3DS >";
 
 static const char *options[] = {"Gemini", "API Key", "Settings"};
 static int selectedOption = 0;
@@ -42,7 +42,7 @@ void Menu_Draw() {
     float startY = SCREEN_TOP_HEIGHT / 2 - 20.0f; 
     float lineSpacing = 30.0f;
 
-    R_DrawText(0, 0, 0.8f, logo, COLOR_TEXT_HIGHLIGHT);
+    R_DrawText(SCREEN_TOP_WIDTH / 2 - 90.0f, 5, 0.8f, logo, COLOR_TEXT_HIGHLIGHT);
 
     for (int i = 0; i < OPTION_COUNT; i++) {
         float y = startY + (i * lineSpacing);
