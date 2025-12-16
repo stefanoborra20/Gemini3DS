@@ -12,6 +12,13 @@ void EditBool(SettingOption*, int);
 void EditCycle(SettingOption*, int);
 void EditInt(SettingOption*, int);
 
+enum {OPT_MODEL=0, OPT_TEMPERATURE, OPT_MAXTOKENS};
+
+const static char *API_MODEL_IDS[] = {
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+};
+
 static SettingOption settings[] = {
     /* Label             {.actual Value}          {min, max, step}     toStringFunc   onEditFun*/
     {"Model: ",          {.iVal=MODEL_2_5_FLASH}, {0, MODEL_COUNT-1, 1}, ModelToString, EditCycle},
@@ -68,7 +75,7 @@ void BoolToString(SettingOption *opt, char *buf, size_t n) {
 void ModelToString(SettingOption *opt, char *buf, size_t n) {
     const char *modelNames[] = {
         "Flash 2.5",
-        "Pro 3.0"
+        "Flash Lite 2.5",
     };
     snprintf(buf, n, "%s", modelNames[opt->value.iVal]);
 }
@@ -120,4 +127,23 @@ void Settings_Draw() {
 
     /* Bottom Screen */
     // TODO Add description for each option 
+}
+
+const char* Settings_GetModel() {
+    int val = settings[OPT_MODEL].value.iVal;
+
+    // Array boundaries check
+    if (val < 0 || val >= (sizeof(API_MODEL_IDS)/sizeof(char*))) {
+        return API_MODEL_IDS[0]; // Return default model
+    }
+
+    return API_MODEL_IDS[val];
+}
+
+float Settings_GetTemperature() {
+    return settings[OPT_TEMPERATURE].value.fVal;
+}
+
+int Settings_GetMaxTokens() {
+    return settings[OPT_MAXTOKENS].value.iVal; 
 }

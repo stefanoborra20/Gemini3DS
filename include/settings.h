@@ -12,7 +12,7 @@ typedef void (*EditFunc)(SettingOption *self, int delta);
 
 typedef enum {
     MODEL_2_5_FLASH=0,
-    MODEL_3_PRO,
+    MODEL_2_5_FLASH_LITE,
     MODEL_COUNT
 } GeminiModel;
 
@@ -40,5 +40,10 @@ void Settings_Init();
 void Settings_Update(u32 kDown);
 
 void Settings_Draw();
+
+// Public getters
+const char* Settings_GetModel();
+float Settings_GetTemperature();
+int Settings_GetMaxTokens();
 
 #endif
