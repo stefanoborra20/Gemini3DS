@@ -1,6 +1,7 @@
 #include "gemini_app.h"
 #include "gemini_net.h"
 #include "renderer.h"
+#include "mic_system.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -27,6 +28,7 @@ void GeminiApp_Update(u32 kDown, const char *apiKey) {
     if (isThinking) return;
 
     u32 kHeld = hidKeysHeld();
+    u32 kUp = hidKeysUp();
     
     // Scroll
     if (kHeld & KEY_DOWN) scrollY += scrollSpeed;
@@ -55,6 +57,31 @@ void GeminiApp_Update(u32 kDown, const char *apiKey) {
             isThinking = false;
         }
     }
+
+    if (kHeld & KEY_Y) Mic_StartRecording();
+    if (Mic_IsRecording()) Mic_Update();
+
+    if (kUp & KEY_Y) {
+        Mic_StopRecording();
+        isThinking = true;
+
+        R_BeginFrame();
+        R_SetTarget(SCREEN_TOP);
+        R_ClearScreen(SCREEN_TOP, COLOR_BACKGROUND);
+        R_DrawText(10, 10, 1, "Sending audio...", COLOR_TEXT_HIGHLIGHT);
+
+        R_EndFrame();
+
+        const char *voicePrompt = 
+        "Roleplay as a helpful voice assistant on a Nintendo 3DS. "
+        "The attached audio is a direct question or statement from the user. "
+        "Do not describe the audio. Do not transcribe what was said. "
+        "Listen to the audio and reply directly and naturally to the user.";
+
+        Net_QueryGeminiAudio(apiKey, voicePrompt, Mic_GetWavBuffer(), Mic_GetWavSize(), responseText, MAX_RESPONSE_LEN);
+        R_ClearText(responseText);
+        isThinking = false;
+    }
 }
 
 void GeminiApp_Draw() {
@@ -81,7 +108,13 @@ void GeminiApp_Draw() {
     R_SetTarget(SCREEN_BOTTOM);
     R_ClearScreen(SCREEN_BOTTOM, COLOR_BACKGROUND);
     
+    // Commands
     R_DrawText(10, 5, 1, "[A] New Promt", COLOR_TEXT_NORMAL);
-    R_DrawText(10, 35, 1, "[B] Back", COLOR_TEXT_NORMAL);
+    R_DrawText(10, 35, 1, "[Y] Record Audio", COLOR_TEXT_NORMAL);
+    R_DrawText(10, 65, 1, "[B] Back", COLOR_TEXT_NORMAL);
+
+    if (Mic_IsRecording()) {
+        R_DrawText(100, 100, 1.0f, "RECORDING..", COLOR_TEXT_NORMAL);
+    }
 }
 

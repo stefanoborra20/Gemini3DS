@@ -8,6 +8,7 @@
 #include "gemini_app.h"
 #include "gemini_net.h"
 #include "settings.h"
+#include "mic_system.h"
 
 char currentApiKey[API_KEY_MAX_LEN] = "";
 bool printApiKeyErr = false;
@@ -23,6 +24,7 @@ typedef enum {
 int init() {
     Net_Init();
     R_Init();
+    Mic_Init();
     Settings_Init();
     GeminiApp_Init();
     return 0;
@@ -30,6 +32,7 @@ int init() {
 
 void quit() {
     R_Exit();
+    Mic_Exit();
     Net_Exit();
 }
 
