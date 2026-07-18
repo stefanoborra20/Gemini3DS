@@ -15,6 +15,8 @@ void EditInt(SettingOption*, int);
 enum {OPT_MODEL=0, OPT_TEMPERATURE, OPT_MAXTOKENS};
 
 const static char *API_MODEL_IDS[] = {
+    "gemini-3.5-flash",
+    "gemini-3.1-flash-lite",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
 };
@@ -27,7 +29,7 @@ const static char *settingDescriptions[] = {
 
 static SettingOption settings[] = {
     /* Label          Description                            {.actual Value}          {min, max, step}       toStringFunc   onEditFun*/
-    {"Model: ",       &settingDescriptions[OPT_MODEL],       {.iVal=MODEL_2_5_FLASH}, {0, MODEL_COUNT-1, 1}, ModelToString, EditCycle},
+    {"Model: ",       &settingDescriptions[OPT_MODEL],       {.iVal=MODEL_3_5_FLASH}, {0, MODEL_COUNT-1, 1}, ModelToString, EditCycle},
     {"Temperature: ", &settingDescriptions[OPT_TEMPERATURE], {.fVal=1.0f},            {0.0f, 2.0f, 0.1f},    FloatToString, EditFloat},
     {"Max Tokens: ",  &settingDescriptions[OPT_MAXTOKENS],   {.iVal=100},             {100, 1000, 1},        IntToString,   EditInt}
 };
@@ -80,8 +82,10 @@ void BoolToString(SettingOption *opt, char *buf, size_t n) {
 
 void ModelToString(SettingOption *opt, char *buf, size_t n) {
     const char *modelNames[] = {
+        "Flash 3.5",
+        "Flash Lite 3.1",
         "Flash 2.5",
-        "Flash Lite 2.5",
+        "Flash Lite 2.5"
     };
     snprintf(buf, n, "%s", modelNames[opt->value.iVal]);
 }
