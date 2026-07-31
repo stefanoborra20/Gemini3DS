@@ -2,6 +2,7 @@
 #include "gemini_net.h"
 #include "renderer.h"
 #include "mic_system.h"
+#include "camera.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -29,7 +30,39 @@ void GeminiApp_Update(u32 kDown, const char *apiKey) {
 
     u32 kHeld = hidKeysHeld();
     u32 kUp = hidKeysUp();
+
+    /* CAMERA CONTROLS */
+    CamMode cam_mode = Cam_GetMode();
+    if ((kDown & KEY_X) && cam_mode == CAM_MODE_OFF) {
+        Cam_StartPreview();
+        snprintf(responseText, MAX_RESPONSE_LEN, "Active preview. [A] Photo [B] Exit.");
+        return;
+    }
+
+    if (cam_mode == CAM_MODE_PREVIEW) {
+        Cam_UpdatePreview(); 
+
+        if (kDown & KEY_A) {
+            Cam_FreezeFrame(); 
+        } else if (kDown & KEY_B) { 
+            Cam_StopPreview(); 
+        }
+        return;
+    }
     
+    if (cam_mode == CAM_MODE_CAPTURED) {
+        if (kDown & KEY_A) { // Confirm image
+            snprintf(responseText, MAX_RESPONSE_LEN, "Image confirmed!");
+            Cam_StopPreview();
+        } else if (kDown & KEY_X) { // Retake image
+            Cam_ResumePreview();
+        } else if (kDown & KEY_B) { // Cancel and exit camera entirely
+            Cam_StopPreview();
+            snprintf(responseText, MAX_RESPONSE_LEN, "Camera cancelled.");
+        }
+        return;
+    }
+
     // Scroll
     if (kHeld & KEY_DOWN) scrollY += scrollSpeed;
     if (kHeld & KEY_UP) scrollY -= scrollSpeed;
@@ -84,53 +117,72 @@ void GeminiApp_Update(u32 kDown, const char *apiKey) {
 }
 
 void GeminiApp_Draw() {
+    CamMode cam_mode = Cam_GetMode();
+
     /* Top screen */
     R_SetTarget(SCREEN_TOP);
     R_ClearScreen(SCREEN_TOP, COLOR_BACKGROUND);
 
-    if (isThinking) {
-        R_DrawText(10, 10, 1, "://Thinking...", COLOR_TEXT_HIGHLIGHT);
-    }
-    else if (Mic_IsRecording()) {
-        R_DrawText(10, 10, 1, "://Recording...", COLOR_TEXT_HIGHLIGHT);
+    if (cam_mode != CAM_MODE_OFF){
+        R_DrawCameraFeed(Cam_GetBuffer());
+        
+        if (cam_mode == CAM_MODE_PREVIEW) {
+            R_DrawText(10, 10, 1, "://Live Camera Preview", COLOR_TEXT_HIGHLIGHT);
+        } else {
+            R_DrawText(10, 10, 1, "://Photo Captured", COLOR_TEXT_HIGHLIGHT);
+        }
+    } else {
 
-        char audioSize[32];
-        snprintf(audioSize, 32, "%lu Bytes", Mic_GetWavSize());
-        R_DrawText(10, 30, 0.6f, audioSize, COLOR_TEXT_NORMAL);
-    }
-    else {
+        if (isThinking) {
+            R_DrawText(10, 10, 1, "://Thinking...", COLOR_TEXT_HIGHLIGHT);
+        }
+        else if (Mic_IsRecording()) {
+            R_DrawText(10, 10, 1, "://Recording...", COLOR_TEXT_HIGHLIGHT);
 
-        float startY = 10.0f;
-        float drawY = startY - scrollY;
-        R_DrawTextWrapped(10.0f, drawY, SCREEN_TOP_WIDTH - 20.0f, responseText, COLOR_TEXT_NORMAL, &totalTextHeight); 
+            char audioSize[32];
+            snprintf(audioSize, 32, "%lu Bytes", Mic_GetWavSize());
+            R_DrawText(10, 30, 0.6f, audioSize, COLOR_TEXT_NORMAL);
+        }
+        else {
 
-        // Draw side bar
-        if (totalTextHeight > SCREEN_TOP_HEIGHT) {
-            float barHeight = (SCREEN_TOP_HEIGHT / totalTextHeight) * SCREEN_TOP_HEIGHT;
-            if (barHeight < 20) barHeight = 20;
+            float startY = 10.0f;
+            float drawY = startY - scrollY;
+            R_DrawTextWrapped(10.0f, drawY, SCREEN_TOP_WIDTH - 20.0f, responseText, COLOR_TEXT_NORMAL, &totalTextHeight); 
 
-            float barPos = (scrollY / (totalTextHeight - SCREEN_TOP_HEIGHT)) * (SCREEN_TOP_HEIGHT - barHeight);
+            // Draw side bar
+            if (totalTextHeight > SCREEN_TOP_HEIGHT) {
+                float barHeight = (SCREEN_TOP_HEIGHT / totalTextHeight) * SCREEN_TOP_HEIGHT;
+                if (barHeight < 20) barHeight = 20;
 
-            R_SetTarget(SCREEN_TOP);
-            R_DrawRectSolid(SCREEN_TOP_WIDTH - 5.0f, barPos, 0.5f, 4.0f, barHeight, COLOR_SCROLL_BAR);
+                float barPos = (scrollY / (totalTextHeight - SCREEN_TOP_HEIGHT)) * (SCREEN_TOP_HEIGHT - barHeight);
+
+                R_SetTarget(SCREEN_TOP);
+                R_DrawRectSolid(SCREEN_TOP_WIDTH - 5.0f, barPos, 0.5f, 4.0f, barHeight, COLOR_SCROLL_BAR);
+            }
         }
     }
 
     /* Bottom screen */
     R_SetTarget(SCREEN_BOTTOM);
     R_ClearScreen(SCREEN_BOTTOM, COLOR_BACKGROUND);
-    
-    // Commands
-    R_DrawText(10, 5, 1, "[A] Text Promt", COLOR_TEXT_NORMAL);
-    R_DrawText(10, 35, 1, "[Y] Audio Promt (Hold)", COLOR_TEXT_NORMAL);
-    R_DrawText(10, 65, 1, "[B] Back", COLOR_TEXT_NORMAL);
+
+    if (cam_mode == CAM_MODE_PREVIEW) {
+        R_DrawText(10, 20, 1, "[A] Capture Photo", COLOR_TEXT_HIGHLIGHT);
+        R_DrawText(10, 60, 1, "[B] Exit Camera", COLOR_TEXT_NORMAL);
+    } 
+    else if (cam_mode == CAM_MODE_CAPTURED) {
+        R_DrawText(10, 20, 1, "[A] Use Image", COLOR_TEXT_HIGHLIGHT);
+        R_DrawText(10, 60, 1, "[X] Retake Photo", COLOR_TEXT_NORMAL);
+        R_DrawText(10, 100, 1, "[B] Exit Camera", COLOR_TEXT_NORMAL); 
+    } 
+    else {
+        R_DrawText(10, 5, 1, "[A] Text Promt", COLOR_TEXT_NORMAL);
+        R_DrawText(10, 35, 1, "[Y] Audio Promt (Hold)", COLOR_TEXT_NORMAL);
+        R_DrawText(10, 65, 1, "[X] Open Camera", COLOR_TEXT_NORMAL);
+        R_DrawText(10, 95, 1, "[B] Back", COLOR_TEXT_NORMAL);
+    }   
 }
 
-/* Since network functions are blocking calls and
- * we are not supporting async functions for now, 
- * we use this function to display system status
- * before making the call 
- */
 void ForceDrawStatus(const char *message) {
     R_BeginFrame();
     
@@ -143,3 +195,6 @@ void ForceDrawStatus(const char *message) {
     gspWaitForVBlank();
 }
 
+void GeminiApp_Exit() {
+    Cam_Exit();
+}

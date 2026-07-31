@@ -4,6 +4,7 @@
 #include <3ds.h>
 
 void GeminiApp_Init();
+void GeminiApp_Exit();
 
 void GeminiApp_Update(u32 kDown, const char *apiKey);
 

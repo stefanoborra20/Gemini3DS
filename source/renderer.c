@@ -8,6 +8,12 @@ static C3D_RenderTarget *bottomTarget;
 static C2D_Font sysFont;
 static C2D_TextBuf staticTextBuf;
 
+static C3D_Tex camTex;
+static u16* alignedBuffer = NULL;
+static Tex3DS_SubTexture camSubtex;
+static C2D_Image camImage;
+static bool camTexInitialized = false;
+
 static u32 getColor(Color color) {
     switch (color) {
         case COLOR_BACKGROUND: return C2D_Color32(0x30, 0x30, 0x30, 0xFF);
@@ -42,6 +48,10 @@ void R_Init() {
 }
 
 void R_Exit() {
+    if (camTexInitialized) {
+        C3D_TexDelete(&camTex);
+        if (alignedBuffer) linearFree(alignedBuffer);
+    }
     C2D_TextBufDelete(staticTextBuf);
     C2D_FontFree(sysFont);
     romfsExit();
@@ -156,6 +166,57 @@ void R_DrawTextWrapped(float x, float y, float widthLimit, const char *text, Col
 
 void R_DrawRectSolid(float x, float y, float z, float width, float height, Color color) {
     C2D_DrawRectSolid(x, y, z, width, height, getColor(color));
+}
+
+void R_DrawCameraFeed(u16 *buffer) {
+    if (!buffer) return;
+
+    if (!camTexInitialized) {
+        C3D_TexInit(&camTex, 512, 256, GPU_RGB565);
+        alignedBuffer = (u16*)linearAlloc(512 * 256 * sizeof(u16));
+        memset(alignedBuffer, 0, 512 * 256 * sizeof(u16));
+
+        camSubtex.width = 400;
+        camSubtex.height = 240;
+        camSubtex.left = 0.0f;
+        camSubtex.top = 240.0f / 256.0f;
+        camSubtex.right = 400.0f / 512.0f;
+        camSubtex.bottom = 0.0f;
+
+        camImage.tex = &camTex;
+        camImage.subtex = &camSubtex;
+
+        camTexInitialized = true;
+    }
+
+    GSPGPU_InvalidateDataCache(buffer, 400 * 240 * sizeof(u16));
+
+    for (int y = 0; y < 240; y++) {
+        memcpy(&alignedBuffer[y * 512], &buffer[y * 400], 400 * sizeof(u16));
+    }
+
+    GSPGPU_FlushDataCache(alignedBuffer, 512 * 256 * sizeof(u16));
+
+    C3D_SyncDisplayTransfer(
+        (u32*)alignedBuffer, GX_BUFFER_DIM(512, 256),
+        (u32*)camTex.data, GX_BUFFER_DIM(512, 256),
+        (GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(1) | GX_TRANSFER_RAW_COPY(0) |
+         GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGB565) |
+         GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB565) |
+         GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
+    );
+
+    C2D_ImageTint tint;
+    C2D_PlainImageTint(&tint, 0xFFFFFFFF, 0.0f);
+
+    C2D_DrawParams params = {
+        .pos = { .x = 0.0f, .y = 0.0f, .w = 400.0f, .h = 240.0f },
+        .center = { .x = 0.0f, .y = 0.0f },
+        .angle = 0.0f,
+        .depth = 0.5f
+    };
+
+    C2D_DrawImage(camImage, &params, &tint);
 }
 
 bool R_OpenKeyboard(const char *hintText, char *outputBuffer, size_t maxLen) {

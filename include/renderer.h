@@ -36,6 +36,7 @@ void R_ClearText(char *text);
 void R_DrawText(float x, float y, float scale, const char *text, Color color);
 void R_DrawTextWrapped(float x, float y, float widthLimit, const char *text, Color color, float *totalTextHeight);
 void R_DrawRectSolid(float x, float y, float z, float width, float height, Color color);
+void R_DrawCameraFeed(u16* buffer);
 
 bool R_OpenKeyboard(const char *hintText, char *outputBuffer, size_t maxLen);
 

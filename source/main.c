@@ -9,6 +9,7 @@
 #include "gemini_net.h"
 #include "settings.h"
 #include "mic_system.h"
+#include "camera.h" 
 
 char currentApiKey[API_KEY_MAX_LEN] = "";
 bool printApiKeyErr = false;
@@ -19,7 +20,6 @@ typedef enum {
     STATE_APIKEY,
     STATE_SETTINGS
 } State;
-
 
 int init() {
     Net_Init();
@@ -51,7 +51,6 @@ int main(int argc, char **argv) {
             case STATE_MENU:
                 MenuAction action = Menu_Update(kDown);
                 if (action == MENU_ACTION_GOTO_GEMINI) {
-                    // Check if Api Key was inserted
                     if (strcmp(currentApiKey, "") != 0) {
                         state = STATE_GEMINI;
                         GeminiApp_Init();
@@ -69,7 +68,10 @@ int main(int argc, char **argv) {
             case STATE_GEMINI:
                 GeminiApp_Update(kDown, currentApiKey);
 
-                if (kDown & KEY_B) state = STATE_MENU;
+                if ((kDown & KEY_B) && Cam_GetMode() == CAM_MODE_OFF) {
+                    GeminiApp_Exit(); 
+                    state = STATE_MENU;
+                }
                 break;
             case STATE_APIKEY: 
                 if (kDown & KEY_B) {
