@@ -74,27 +74,29 @@ static char *Base64_Encode(const unsigned char *data, size_t length) {
     return encoded_data;
 }
 
-static char* Create_JSON(const char *promt, u8 *audioData, u32 audioSize) {
+static char* Create_JSON(const char *promt, u8 *mediaData, u32 mediaSize, const char *mimeType) {
     json_t *root = json_object();
     json_t *contents = json_array();
     json_t *content_obj = json_object();
     json_t *parts = json_array();
 
+    // 1. Add text prompt
     json_t *text_part = json_object();
     json_object_set_new(text_part, "text", json_string(promt ? promt : ""));
     json_array_append_new(parts, text_part);
 
-    if (audioData && audioSize > 0) {
-        char *base64Str = Base64_Encode(audioData, audioSize);
+    // 2. Add media (Audio or Image) if provided
+    if (mediaData && mediaSize > 0 && mimeType) {
+        char *base64Str = Base64_Encode(mediaData, mediaSize);
         if (base64Str) {
-            json_t *audio_part = json_object();
+            json_t *media_part = json_object();
             json_t *inline_data = json_object();
 
-            json_object_set_new(inline_data, "mimeType", json_string("audio/wav"));
+            json_object_set_new(inline_data, "mimeType", json_string(mimeType));
             json_object_set_new(inline_data, "data", json_string(base64Str));
-            json_object_set_new(audio_part, "inlineData", inline_data);
+            json_object_set_new(media_part, "inlineData", inline_data);
 
-            json_array_append_new(parts, audio_part);
+            json_array_append_new(parts, media_part);
 
             free(base64Str);
         } else {
@@ -210,7 +212,7 @@ static bool Parse_Gemini_Response(char *jsonBuffer, size_t bufferSize) {
 }
 
 bool Net_QueryGemini(const char *apiKey, const char *promt, char *responseBuffer, size_t bufferSize) {
-    char *jsonBody = Create_JSON(promt, NULL, 0);
+    char *jsonBody = Create_JSON(promt, NULL, 0, NULL);
     if (!jsonBody) return false;
 
     bool netSuccess = Perform_CURL_Request(apiKey, jsonBody, responseBuffer, bufferSize);
@@ -224,7 +226,23 @@ bool Net_QueryGemini(const char *apiKey, const char *promt, char *responseBuffer
 }
 
 bool Net_QueryGeminiAudio(const char *apiKey, const char *promt, u8 *audioData, u32 audioSize, char *responseBuffer, size_t bufferSize) {
-    char *jsonBody = Create_JSON(promt, audioData, audioSize);
+    // Pass "audio/wav" as the mime type
+    char *jsonBody = Create_JSON(promt, audioData, audioSize, "audio/wav");
+    if (!jsonBody) return false;
+
+    bool netSuccess = Perform_CURL_Request(apiKey, jsonBody, responseBuffer, bufferSize);
+    free(jsonBody);
+
+    if (netSuccess) {
+        return Parse_Gemini_Response(responseBuffer, bufferSize);
+    }
+
+    return false;
+}
+
+bool Net_QueryGeminiImage(const char *apiKey, const char *promt, u8 *imageData, size_t imageSize, char *responseBuffer, size_t bufferSize) {
+    // Pass "image/jpeg" as the mime type for the camera feed
+    char *jsonBody = Create_JSON(promt, imageData, imageSize, "image/jpeg");
     if (!jsonBody) return false;
 
     bool netSuccess = Perform_CURL_Request(apiKey, jsonBody, responseBuffer, bufferSize);

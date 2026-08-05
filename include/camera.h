@@ -39,5 +39,7 @@ u16* Cam_GetBuffer();
 CamMode Cam_GetMode();
 
 bool Cam_Capture();
+bool Cam_GetJpegData(JpegImage *img);
+void Cam_FreeJpegData(JpegImage *img);
 
 #endif

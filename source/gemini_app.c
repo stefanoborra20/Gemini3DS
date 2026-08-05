@@ -3,8 +3,10 @@
 #include "renderer.h"
 #include "mic_system.h"
 #include "camera.h"
+#include "image_utils.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define MAX_RESPONSE_LEN 8192
 #define MAX_PROMT_LEN 256
@@ -52,8 +54,35 @@ void GeminiApp_Update(u32 kDown, const char *apiKey) {
     
     if (cam_mode == CAM_MODE_CAPTURED) {
         if (kDown & KEY_A) { // Confirm image
-            snprintf(responseText, MAX_RESPONSE_LEN, "Image confirmed!");
+            isThinking = true; 
+            ForceDrawStatus("::/Compressing image...");
+            size_t jpegSize = 0;
+            u8 *jpegBuffer = Encode_JPEG(Cam_GetBuffer(), 400, 240, 80, &jpegSize);
+
+            if (jpegBuffer) {
+                promtBuffer[0] = '\0';
+                if (R_OpenKeyboard("Ask about this image...", promtBuffer, MAX_PROMT_LEN)) {
+                    isThinking=true;
+                    ForceDrawStatus("://Sending image & text to Gemini...");
+
+                    const char *finalPromt = (strlen(promtBuffer) > 0) ? promtBuffer : "Describe this photo made from my Nintendo 3DS.";
+
+                    Net_QueryGeminiImage(apiKey, finalPromt, jpegBuffer, jpegSize, responseText, MAX_RESPONSE_LEN);
+
+                    R_ClearText(responseText);
+                    isThinking=false;
+                } else {
+                    snprintf(responseText, MAX_RESPONSE_LEN, "Image prompt cancelled.");
+                }
+                free(jpegBuffer);
+                
+                
+            } else {
+                snprintf(responseText, MAX_RESPONSE_LEN, "Error: Failed to compress JPEG.");
+            }
+            
             Cam_StopPreview();
+            isThinking = false;
         } else if (kDown & KEY_X) { // Retake image
             Cam_ResumePreview();
         } else if (kDown & KEY_B) { // Cancel and exit camera entirely
