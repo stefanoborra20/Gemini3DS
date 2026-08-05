@@ -12,7 +12,7 @@
 #define MAX_PROMT_LEN 256
 
 static char responseText[MAX_RESPONSE_LEN];
-static char promtBuffer[MAX_PROMT_LEN];
+static char promptBuffer[MAX_PROMT_LEN];
 static bool isThinking = false;
 static float scrollY;
 static float totalTextHeight;
@@ -20,7 +20,7 @@ static const float scrollSpeed = 6.0f;
 static float maxScrollY;
 
 void GeminiApp_Init() {
-    snprintf(responseText, MAX_RESPONSE_LEN, "://Gemini3DS/Insert promt");
+    snprintf(responseText, MAX_RESPONSE_LEN, "://Gemini3DS/Insert prompt");
     isThinking = false;
     scrollY = 0.0f;
     totalTextHeight = 0.0f;
@@ -60,12 +60,12 @@ static void Handle_CameraState(u32 kDown, CamMode cam_mode, const char* apiKey) 
             u8 *jpegBuffer = Encode_JPEG(Cam_GetBuffer(), 400, 240, 80, &jpegSize);
 
             if (jpegBuffer) {
-                promtBuffer[0] = '\0';
-                if (R_OpenKeyboard("Ask about this image...", promtBuffer, MAX_PROMT_LEN)) {
+                promptBuffer[0] = '\0';
+                if (R_OpenKeyboard("Ask about this image...", promptBuffer, MAX_PROMT_LEN)) {
                     isThinking=true;
                     ForceDrawStatus("://Sending image...");
 
-                    const char *finalPromt = (strlen(promtBuffer) > 0) ? promtBuffer : "Describe this photo made from my Nintendo 3DS.";
+                    const char *finalPromt = (strlen(promptBuffer) > 0) ? promptBuffer : "Describe this photo made from my Nintendo 3DS.";
 
                     Net_QueryGeminiImage(apiKey, finalPromt, jpegBuffer, jpegSize, responseText, MAX_RESPONSE_LEN);
 
@@ -102,14 +102,14 @@ static void Handle_Scrolling(u32 kHeld) {
 
 static void Handle_TextPromt(u32 kDown, const char *apiKey) {
     if (kDown & KEY_A) {
-        promtBuffer[0] = '\0';
+        promptBuffer[0] = '\0';
 
-        if (R_OpenKeyboard("Ask Gemini...", promtBuffer, MAX_PROMT_LEN)) {
+        if (R_OpenKeyboard("Ask Gemini...", promptBuffer, MAX_PROMT_LEN)) {
             isThinking = true;
             
             ForceDrawStatus("://Thinking...");
 
-            Net_QueryGemini(apiKey, promtBuffer, responseText, MAX_RESPONSE_LEN);
+            Net_QueryGemini(apiKey, promptBuffer, responseText, MAX_RESPONSE_LEN);
             R_ClearText(responseText);
             isThinking = false;
         }
