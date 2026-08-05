@@ -31,16 +31,10 @@ static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, voi
     size_t realSize = size * nmemb;
     ResponseData *mem = (ResponseData *)userp;
 
-    if (mem->size + realSize >= mem->maxSize) {
-        if (mem->size < mem->maxSize - 1) {
-            size_t safeSize = mem->maxSize - mem->size -1;
-            memcpy(&(mem->memory[mem->size]), contents, safeSize);
-            mem->size += safeSize;
-        }
-        mem->memory[mem->size] = '\0';
-        return realSize;
-    }
-
+    char *ptr = realloc(mem->memory, mem->size + realSize + 1);
+    if (!ptr) return 0;
+    
+    mem->memory = ptr;
     memcpy(&(mem->memory[mem->size]), contents, realSize);
     mem->size += realSize;
     mem->memory[mem->size] = '\0';
@@ -114,40 +108,31 @@ static char* Create_JSON(const char *promt, u8 *mediaData, u32 mediaSize, const 
     return json_string;
 }
 
-static bool Perform_CURL_Request(const char *apiKey, const char *jsonBody, char *outBuffer, size_t outBufSize) {
+static char* Perform_CURL_Request(const char *apiKey, const char *jsonBody, char *outBuffer, size_t outBufSize) {
     CURL *curl = curl_easy_init();
-    if (!curl) return false;
+    if (!curl) return NULL;
 
-    bool success = false;
     char url[512];
-
     snprintf(url, sizeof(url),
            "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
-           Settings_GetModel(),
-           apiKey);
+           Settings_GetModel(), apiKey);
 
     ResponseData chunk;
-    chunk.memory = outBuffer;
+    chunk.memory = malloc(1); 
     chunk.size = 0;
-    chunk.maxSize = outBufSize;
-    outBuffer[0] = '\0';
+    if (chunk.memory) chunk.memory[0] = '\0';
 
     struct curl_slist *headers = NULL;
     headers = curl_slist_append(headers, "Content-Type: application/json");
 
-    // CURL setup
-    // Force IPv4 and longer timers
     curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
-
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, jsonBody);
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*) &chunk);
-
-    // Disable SSL
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
     
@@ -155,26 +140,28 @@ static bool Perform_CURL_Request(const char *apiKey, const char *jsonBody, char 
     long http_code = 0;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 
-    if (res != CURLE_OK) {
-        snprintf(outBuffer, outBufSize, "Curl Error: %s", curl_easy_strerror(res));
-    } else if (http_code != 200) {
-        char tmpErr[128];
-        snprintf(tmpErr, sizeof(tmpErr), "HTTP Error %ld", http_code);
-    } else {
-        success = true;
-    }
-
     curl_easy_cleanup(curl);
     curl_slist_free_all(headers);
-    return success;
+
+    if (res != CURLE_OK) {
+        snprintf(outBuffer, outBufSize, "Curl Error: %s", curl_easy_strerror(res));
+        free(chunk.memory);
+        return NULL;
+    } else if (http_code != 200) {
+        snprintf(outBuffer, outBufSize, "HTTP Error %ld", http_code);
+        free(chunk.memory);
+        return NULL;
+    }
+
+    return chunk.memory; 
 }
 
-static bool Parse_Gemini_Response(char *jsonBuffer, size_t bufferSize) {
+static bool Parse_Gemini_Response(const char *jsonString, char *outBuffer, size_t bufferSize) {
     json_error_t error;
-    json_t *root = json_loads(jsonBuffer, 0, &error);
+    json_t *root = json_loads(jsonString, 0, &error);
 
     if (!root) {
-        snprintf(jsonBuffer, bufferSize, "JSON Parse Error: %s", error.text);
+        snprintf(outBuffer, bufferSize, "JSON Parse Error: %s", error.text);
         return false;
     }
 
@@ -191,20 +178,12 @@ static bool Parse_Gemini_Response(char *jsonBuffer, size_t bufferSize) {
         const char *text_content = json_string_value(text_obj);
 
         if (text_content) {
-            char *tmp = malloc(bufferSize);
-            if (tmp) {
-                strncpy(tmp, text_content, bufferSize - 1);
-                tmp[bufferSize - 1] = '\0';
-
-                strncpy(jsonBuffer, tmp, bufferSize - 1);
-                jsonBuffer[bufferSize - 1] = '\0';
-                free(tmp);
-
-                success = true;
-            }
+            strncpy(outBuffer, text_content, bufferSize - 1);
+            outBuffer[bufferSize - 1] = '\0';
+            success = true;
         }
     } else {
-        snprintf(jsonBuffer, bufferSize, "API ERR: Non content returned.");
+        snprintf(outBuffer, bufferSize, "API ERR: No content returned.");
     }
 
     json_decref(root);
@@ -215,42 +194,44 @@ bool Net_QueryGemini(const char *apiKey, const char *promt, char *responseBuffer
     char *jsonBody = Create_JSON(promt, NULL, 0, NULL);
     if (!jsonBody) return false;
 
-    bool netSuccess = Perform_CURL_Request(apiKey, jsonBody, responseBuffer, bufferSize);
+    char *rawJson = Perform_CURL_Request(apiKey, jsonBody, responseBuffer, bufferSize);
     free(jsonBody);
 
-    if (netSuccess) {
-        return Parse_Gemini_Response(responseBuffer, bufferSize);
+    if (rawJson) {
+        bool success = Parse_Gemini_Response(rawJson, responseBuffer, bufferSize);
+        free(rawJson); 
+        return success;
     }
-
     return false;
 }
 
 bool Net_QueryGeminiAudio(const char *apiKey, const char *promt, u8 *audioData, u32 audioSize, char *responseBuffer, size_t bufferSize) {
-    // Pass "audio/wav" as the mime type
     char *jsonBody = Create_JSON(promt, audioData, audioSize, "audio/wav");
     if (!jsonBody) return false;
 
-    bool netSuccess = Perform_CURL_Request(apiKey, jsonBody, responseBuffer, bufferSize);
+    char *rawJson = Perform_CURL_Request(apiKey, jsonBody, responseBuffer, bufferSize);
     free(jsonBody);
 
-    if (netSuccess) {
-        return Parse_Gemini_Response(responseBuffer, bufferSize);
+    if (rawJson) {
+        bool success = Parse_Gemini_Response(rawJson, responseBuffer, bufferSize);
+        free(rawJson);
+        return success;
     }
-
     return false;
 }
 
 bool Net_QueryGeminiImage(const char *apiKey, const char *promt, u8 *imageData, size_t imageSize, char *responseBuffer, size_t bufferSize) {
-    // Pass "image/jpeg" as the mime type for the camera feed
     char *jsonBody = Create_JSON(promt, imageData, imageSize, "image/jpeg");
     if (!jsonBody) return false;
 
-    bool netSuccess = Perform_CURL_Request(apiKey, jsonBody, responseBuffer, bufferSize);
+    char *rawJson = Perform_CURL_Request(apiKey, jsonBody, responseBuffer, bufferSize);
     free(jsonBody);
 
-    if (netSuccess) {
-        return Parse_Gemini_Response(responseBuffer, bufferSize);
+    if (rawJson) {
+        bool success = Parse_Gemini_Response(rawJson, responseBuffer, bufferSize);
+        free(rawJson);
+        return success;
     }
-
     return false;
 }
+
