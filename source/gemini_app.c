@@ -160,7 +160,6 @@ void GeminiApp_Update(u32 kDown, const char *apiKey) {
 
     if (kDown & KEY_X) {
         Cam_StartPreview();
-        snprintf(responseText, MAX_RESPONSE_LEN, "Active preview. [A] Photo [B] Exit");
         return;
     }
 
@@ -178,9 +177,9 @@ static void Draw_TopScreen(CamMode cam_mode){
         R_DrawCameraFeed(Cam_GetBuffer());
         
         if (cam_mode == CAM_MODE_PREVIEW) {
-            R_DrawText(10, 10, 1, "://Live Camera Preview", COLOR_TEXT_HIGHLIGHT);
+            R_DrawText(10, 10, 1, "://Live Camera Preview", COLOR_TEXT_NORMAL);
         } else {
-            R_DrawText(10, 10, 1, "://Photo Captured", COLOR_TEXT_HIGHLIGHT);
+            R_DrawText(10, 10, 1, "://Photo Captured", COLOR_TEXT_NORMAL);
         }
     } else {
 

@@ -66,9 +66,11 @@ int main(int argc, char **argv) {
                 }
                 break;
             case STATE_GEMINI:
+                CamMode mode_before_update = Cam_GetMode();
+
                 GeminiApp_Update(kDown, currentApiKey);
 
-                if ((kDown & KEY_B) && Cam_GetMode() == CAM_MODE_OFF) {
+                if ((kDown & KEY_B) && mode_before_update == CAM_MODE_OFF) {
                     GeminiApp_Exit(); 
                     state = STATE_MENU;
                 }
