@@ -181,7 +181,8 @@ void R_DrawCameraFeed(u16 *buffer) {
         camSubtex.left = 0.0f;
         camSubtex.top = 240.0f / 256.0f;
         camSubtex.right = 400.0f / 512.0f;
-        camSubtex.bottom = 0.0f;
+
+        camSubtex.bottom = 16.0f / 256.0f;
 
         camImage.tex = &camTex;
         camImage.subtex = &camSubtex;
