@@ -9,10 +9,10 @@
 #include <stdlib.h>
 
 #define MAX_RESPONSE_LEN 8192
-#define MAX_PROMT_LEN 256
+#define MAX_PROMPT_LEN 256
 
 static char responseText[MAX_RESPONSE_LEN];
-static char promptBuffer[MAX_PROMT_LEN];
+static char promptBuffer[MAX_PROMPT_LEN];
 static bool isThinking = false;
 static float scrollY;
 static float totalTextHeight;
@@ -25,6 +25,8 @@ void GeminiApp_Init() {
     scrollY = 0.0f;
     totalTextHeight = 0.0f;
     maxScrollY = 0.0f;
+
+    Net_SetStatusCallback(ForceDrawStatus);
 }
 
 void GeminiApp_Exit() {
@@ -40,7 +42,7 @@ void ForceDrawStatus(const char *message) {
     gspWaitForVBlank();
 }
 
-static void Handle_CameraState(u32 kDown, CamMode cam_mode, const char* apiKey) {
+static void Handle_CameraState(u32 kDown, CamMode cam_mode) {
     if (cam_mode == CAM_MODE_PREVIEW) {
         Cam_UpdatePreview(); 
 
@@ -61,13 +63,13 @@ static void Handle_CameraState(u32 kDown, CamMode cam_mode, const char* apiKey) 
 
             if (jpegBuffer) {
                 promptBuffer[0] = '\0';
-                if (R_OpenKeyboard("Ask about this image...", promptBuffer, MAX_PROMT_LEN)) {
+                if (R_OpenKeyboard("Ask about this image...", promptBuffer, MAX_PROMPT_LEN)) {
                     isThinking=true;
                     ForceDrawStatus("://Sending image...");
 
                     const char *finalPromt = (strlen(promptBuffer) > 0) ? promptBuffer : "Describe this photo made from my Nintendo 3DS.";
 
-                    Net_QueryGeminiImage(apiKey, finalPromt, jpegBuffer, jpegSize, responseText, MAX_RESPONSE_LEN);
+                    Net_QueryGeminiImage(finalPromt, jpegBuffer, jpegSize, responseText, MAX_RESPONSE_LEN);
 
                     R_ClearText(responseText);
                     isThinking=false;
@@ -100,23 +102,23 @@ static void Handle_Scrolling(u32 kHeld) {
     if (scrollY > maxScrollY) scrollY = maxScrollY;
 }
 
-static void Handle_TextPromt(u32 kDown, const char *apiKey) {
+static void Handle_TextPromt(u32 kDown) {
     if (kDown & KEY_A) {
         promptBuffer[0] = '\0';
 
-        if (R_OpenKeyboard("Ask Gemini...", promptBuffer, MAX_PROMT_LEN)) {
+        if (R_OpenKeyboard("Ask Gemini...", promptBuffer, MAX_PROMPT_LEN)) {
             isThinking = true;
             
             ForceDrawStatus("://Thinking...");
 
-            Net_QueryGemini(apiKey, promptBuffer, responseText, MAX_RESPONSE_LEN);
+            Net_QueryGemini(promptBuffer, responseText, MAX_RESPONSE_LEN);
             R_ClearText(responseText);
             isThinking = false;
         }
     }
 }
 
-static void Handle_AudioPromt(u32 kHeld, u32 kUp, const char *apiKey) {
+static void Handle_AudioPromt(u32 kHeld, u32 kUp) {
     if (kHeld & KEY_Y) Mic_StartRecording();
 
     if (Mic_IsRecording())  {
@@ -139,14 +141,14 @@ static void Handle_AudioPromt(u32 kHeld, u32 kUp, const char *apiKey) {
             "Do not describe the audio. Do not transcribe what was said. "
             "Listen to the audio and reply directly and naturally to the user.";
 
-            Net_QueryGeminiAudio(apiKey, voicePrompt, Mic_GetWavBuffer(), Mic_GetWavSize(), responseText, MAX_RESPONSE_LEN);
+            Net_QueryGeminiAudio(voicePrompt, Mic_GetWavBuffer(), Mic_GetWavSize(), responseText, MAX_RESPONSE_LEN);
             R_ClearText(responseText);
             isThinking = false;
         }
     }
 }
 
-void GeminiApp_Update(u32 kDown, const char *apiKey) {
+void GeminiApp_Update(u32 kDown) {
     if (isThinking) return;
 
     u32 kHeld = hidKeysHeld();
@@ -154,7 +156,7 @@ void GeminiApp_Update(u32 kDown, const char *apiKey) {
     CamMode cam_mode = Cam_GetMode();
 
     if (cam_mode != CAM_MODE_OFF) {
-        Handle_CameraState(kDown, cam_mode, apiKey);
+        Handle_CameraState(kDown, cam_mode);
         return;
     }
 
@@ -164,8 +166,8 @@ void GeminiApp_Update(u32 kDown, const char *apiKey) {
     }
 
     Handle_Scrolling(kHeld);
-    Handle_TextPromt(kDown, apiKey);
-    Handle_AudioPromt(kHeld, kUp, apiKey);
+    Handle_TextPromt(kDown);
+    Handle_AudioPromt(kHeld, kUp);
 }
 
 static void Draw_TopScreen(CamMode cam_mode){
