@@ -1,6 +1,8 @@
 # Gemini 3DS
 
 **An unofficial Google Gemini client for the Nintendo 3DS.**
+> 📝 **Note on Sending Images:** 
+> When taking photos with the 3DS camera, it is recommended to stick to the **Flash** or **Flash Lite** models. Heavier models take significantly longer to process image data, which can cause the 3DS to hit a network timeout (cURL timeout).
 
 ## 📥 Setup
 
