@@ -105,6 +105,11 @@ static char* Create_JSON(const char *prompt, u8 *mediaData, u32 mediaSize, const
     json_array_append_new(contents, content_obj);
     json_object_set_new(root, "contents", contents);
 
+    json_t *gen_config  = json_object();
+    json_object_set_new(gen_config, "temperature", json_real((double)Settings_GetTemperature()));
+    json_object_set_new(gen_config, "maxOutputTokens", json_integer((json_int_t)Settings_GetMaxTokens()));
+    json_object_set_new(root, "generationConfig", gen_config);
+
     char *json_string = json_dumps(root, 0);
     json_decref(root);
     return json_string;

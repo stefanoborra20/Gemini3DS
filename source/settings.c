@@ -31,7 +31,7 @@ static SettingOption settings[] = {
     /* Label          Description                            {.actual Value}          {min, max, step}       toStringFunc   onEditFun*/
     {"Model: ",       &settingDescriptions[OPT_MODEL],       {.iVal=MODEL_3_5_FLASH}, {0, MODEL_COUNT-1, 1}, ModelToString, EditCycle},
     {"Temperature: ", &settingDescriptions[OPT_TEMPERATURE], {.fVal=1.0f},            {0.0f, 2.0f, 0.1f},    FloatToString, EditFloat},
-    {"Max Tokens: ",  &settingDescriptions[OPT_MAXTOKENS],   {.iVal=100},             {100, 1000, 1},        IntToString,   EditInt}
+    {"Max Tokens: ",  &settingDescriptions[OPT_MAXTOKENS],   {.iVal=1000},            {100, 3000, 100},      IntToString,   EditInt}
 };
 
 #define OPTION_COUNT sizeof(settings) / sizeof(SettingOption)
