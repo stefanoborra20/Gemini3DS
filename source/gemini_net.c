@@ -5,11 +5,13 @@
 #include <malloc.h>
 #include <curl/curl.h>
 #include <jansson.h>
+#include "api_key_manager.h"
 
 #define SOC_ALIGN 0x1000
 #define SOC_BUFFER_SIZE 0x100000
 
 static u32* socBuffer = NULL;
+static NetStatusCallback g_statusCallback = NULL;
 
 void Net_Init() {
     socBuffer = (u32*)memalign(SOC_ALIGN, SOC_BUFFER_SIZE);
@@ -108,52 +110,94 @@ static char* Create_JSON(const char *prompt, u8 *mediaData, u32 mediaSize, const
     return json_string;
 }
 
-static char* Perform_CURL_Request(const char *apiKey, const char *jsonBody, char *outBuffer, size_t outBufSize) {
-    CURL *curl = curl_easy_init();
-    if (!curl) return NULL;
+void Net_SetStatusCallback(NetStatusCallback cb) {
+    g_statusCallback = cb;
+}
 
-    char url[512];
-    snprintf(url, sizeof(url),
-           "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
-           Settings_GetModel(), apiKey);
+static char* Perform_CURL_Request(const char *jsonBody, char *outBuffer, size_t outBufSize) {
+    int max_tries = ApiManager_IsRotationEnabled() ? ApiManager_GetTotalKeys() : 1;
+    if (max_tries == 0) max_tries = 1;
 
+    int current_try = 0;
     ResponseData chunk;
-    chunk.memory = malloc(1); 
-    chunk.size = 0;
-    if (chunk.memory) chunk.memory[0] = '\0';
+    chunk.memory = NULL;
 
-    struct curl_slist *headers = NULL;
-    headers = curl_slist_append(headers, "Content-Type: application/json");
+    while (current_try < max_tries) {
+        const char *apiKey = ApiManager_GetActiveKey();
+        if (!apiKey || strlen(apiKey) == 0) {
+            snprintf(outBuffer, outBufSize, "Error: No API Key available.");
+            return NULL;
+        }
 
-    curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
-    curl_easy_setopt(curl, CURLOPT_URL, url);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, jsonBody);
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*) &chunk);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-    
-    CURLcode res = curl_easy_perform(curl);
-    long http_code = 0;
-    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+        CURL *curl = curl_easy_init();
+        if (!curl) return NULL;
 
-    curl_easy_cleanup(curl);
-    curl_slist_free_all(headers);
+        char url[512];
+        snprintf(url, sizeof(url),
+                 "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
+                 Settings_GetModel(), apiKey);
 
-    if (res != CURLE_OK) {
-        snprintf(outBuffer, outBufSize, "Curl Error: %s", curl_easy_strerror(res));
-        free(chunk.memory);
-        return NULL;
-    } else if (http_code != 200) {
-        snprintf(outBuffer, outBufSize, "HTTP Error %ld", http_code);
-        free(chunk.memory);
-        return NULL;
+        chunk.memory = malloc(1); 
+        chunk.size = 0;
+        if (chunk.memory) chunk.memory[0] = '\0';
+
+        struct curl_slist *headers = NULL;
+        headers = curl_slist_append(headers, "Content-Type: application/json");
+
+        curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+        curl_easy_setopt(curl, CURLOPT_URL, url);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, jsonBody);
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*) &chunk);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+        
+        CURLcode res = curl_easy_perform(curl);
+        long http_code = 0;
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+        curl_easy_cleanup(curl);
+        curl_slist_free_all(headers);
+
+        if (res != CURLE_OK) {
+            snprintf(outBuffer, outBufSize, "Curl Error: %s", curl_easy_strerror(res));
+            free(chunk.memory);
+            return NULL;
+        } 
+        
+        // --- AUTO ROTATION LOGIC ---
+        if (http_code == 429 || http_code == 503) {
+            free(chunk.memory);
+
+            if (ApiManager_IsRotationEnabled() && current_try < (max_tries - 1)) {
+                ApiManager_RotateKey();
+                current_try++;
+               
+                if (g_statusCallback) {
+                    char status[64];
+                    snprintf(status, sizeof(status), "://Rate Limit. Trying key %d...", ApiManager_GetActiveKeyIndex()+1);
+                    g_statusCallback(status);
+                }
+                continue;
+
+            } else {
+                snprintf(outBuffer, outBufSize, "HTTP Error %ld: Rate Limit/Overloaded", http_code);
+                return NULL;
+            }
+        } 
+        else if (http_code != 200) {
+            snprintf(outBuffer, outBufSize, "HTTP Error %ld", http_code);
+            free(chunk.memory);
+            return NULL;
+        }
+        return chunk.memory; 
     }
 
-    return chunk.memory; 
+    snprintf(outBuffer, outBufSize, "Failed after multiple key retries.");
+    return NULL;
 }
 
 static bool Parse_Gemini_Response(const char *jsonString, char *outBuffer, size_t bufferSize) {
@@ -190,11 +234,11 @@ static bool Parse_Gemini_Response(const char *jsonString, char *outBuffer, size_
     return success;
 }
 
-bool Net_QueryGemini(const char *apiKey, const char *prompt, char *responseBuffer, size_t bufferSize) {
+bool Net_QueryGemini(const char *prompt, char *responseBuffer, size_t bufferSize) {
     char *jsonBody = Create_JSON(prompt, NULL, 0, NULL);
     if (!jsonBody) return false;
 
-    char *rawJson = Perform_CURL_Request(apiKey, jsonBody, responseBuffer, bufferSize);
+    char *rawJson = Perform_CURL_Request(jsonBody, responseBuffer, bufferSize);
     free(jsonBody);
 
     if (rawJson) {
@@ -205,11 +249,11 @@ bool Net_QueryGemini(const char *apiKey, const char *prompt, char *responseBuffe
     return false;
 }
 
-bool Net_QueryGeminiAudio(const char *apiKey, const char *prompt, u8 *audioData, u32 audioSize, char *responseBuffer, size_t bufferSize) {
+bool Net_QueryGeminiAudio(const char *prompt, u8 *audioData, u32 audioSize, char *responseBuffer, size_t bufferSize) {
     char *jsonBody = Create_JSON(prompt, audioData, audioSize, "audio/wav");
     if (!jsonBody) return false;
 
-    char *rawJson = Perform_CURL_Request(apiKey, jsonBody, responseBuffer, bufferSize);
+    char *rawJson = Perform_CURL_Request(jsonBody, responseBuffer, bufferSize);
     free(jsonBody);
 
     if (rawJson) {
@@ -220,11 +264,11 @@ bool Net_QueryGeminiAudio(const char *apiKey, const char *prompt, u8 *audioData,
     return false;
 }
 
-bool Net_QueryGeminiImage(const char *apiKey, const char *prompt, u8 *imageData, size_t imageSize, char *responseBuffer, size_t bufferSize) {
+bool Net_QueryGeminiImage(const char *prompt, u8 *imageData, size_t imageSize, char *responseBuffer, size_t bufferSize) {
     char *jsonBody = Create_JSON(prompt, imageData, imageSize, "image/jpeg");
     if (!jsonBody) return false;
 
-    char *rawJson = Perform_CURL_Request(apiKey, jsonBody, responseBuffer, bufferSize);
+    char *rawJson = Perform_CURL_Request(jsonBody, responseBuffer, bufferSize);
     free(jsonBody);
 
     if (rawJson) {

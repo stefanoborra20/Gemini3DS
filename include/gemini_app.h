@@ -6,7 +6,7 @@
 void GeminiApp_Init();
 void GeminiApp_Exit();
 
-void GeminiApp_Update(u32 kDown, const char *apiKey);
+void GeminiApp_Update(u32 kDown);
 
 void GeminiApp_Draw();
 

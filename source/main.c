@@ -2,16 +2,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <malloc.h>
+#include <string.h>
 #include "renderer.h"
 #include "menu.h"
-#include "mem.h"
 #include "gemini_app.h"
 #include "gemini_net.h"
 #include "settings.h"
 #include "mic_system.h"
 #include "camera.h" 
+#include "api_key_manager.h"
 
-char currentApiKey[API_KEY_MAX_LEN] = "";
 bool printApiKeyErr = false;
 
 typedef enum {
@@ -27,6 +27,7 @@ int init() {
     Mic_Init();
     Settings_Init();
     GeminiApp_Init();
+    ApiManager_Init();
     return 0;
 } 
 
@@ -40,18 +41,18 @@ int main(int argc, char **argv) {
     if (init() != 0) quit();
     
     State state = STATE_MENU;
-    Mem_LoadApiKey(currentApiKey, API_KEY_MAX_LEN);
 
     while (aptMainLoop()) {
         hidScanInput();
         u32 kDown = hidKeysDown();
         if (kDown & KEY_START) break;
 
+        // --- UPDATE LOGIC ---
         switch (state) {
             case STATE_MENU:
                 MenuAction action = Menu_Update(kDown);
                 if (action == MENU_ACTION_GOTO_GEMINI) {
-                    if (strcmp(currentApiKey, "") != 0) {
+                    if (strlen(ApiManager_GetActiveKey()) > 0) {
                         state = STATE_GEMINI;
                         GeminiApp_Init();
                     } else {
@@ -65,67 +66,54 @@ int main(int argc, char **argv) {
                     state = STATE_SETTINGS;
                 }
                 break;
+                
             case STATE_GEMINI:
+            {
                 CamMode mode_before_update = Cam_GetMode();
-
-                GeminiApp_Update(kDown, currentApiKey);
+                GeminiApp_Update(kDown);
 
                 if ((kDown & KEY_B) && mode_before_update == CAM_MODE_OFF) {
                     GeminiApp_Exit(); 
                     state = STATE_MENU;
                 }
                 break;
+            }
+                
             case STATE_APIKEY: 
+                ApiManager_Update(kDown);
                 if (kDown & KEY_B) {
                     state = STATE_MENU;
                 }
-                if (kDown & KEY_A) {
-                    char tempBuffer[API_KEY_MAX_LEN];
-                    strncpy(tempBuffer, currentApiKey, API_KEY_MAX_LEN);
-                    if (strcmp(tempBuffer, "No Api Key") == 0) tempBuffer[0] = '\0'; 
-
-                    if (R_OpenKeyboard("Insert your Gemini API Key", tempBuffer, API_KEY_MAX_LEN)) {
-                        strncpy(currentApiKey, tempBuffer, API_KEY_MAX_LEN);
-                        Mem_SaveApiKey(currentApiKey);
-                        if (printApiKeyErr) printApiKeyErr = false;
-                    }
-                } 
                 break;
+                
             case STATE_SETTINGS:
                 Settings_Update(kDown); 
-
                 if (kDown & KEY_B) {
                     state = STATE_MENU;
                 } 
                 break;
-
         }
 
-        // Draw
+        // --- DRAW LOGIC ---
         R_BeginFrame();
 
         switch (state) {
             case STATE_MENU:
                 Menu_Draw();
-
                 if (printApiKeyErr) {
                     R_SetTarget(SCREEN_BOTTOM);
                     R_DrawText(10, 5, 1, "No api key inserted", COLOR_TEXT_HIGHLIGHT);
                 }
                 break;
-            case STATE_APIKEY:
-                R_SetTarget(SCREEN_BOTTOM);
-                R_ClearScreen(SCREEN_BOTTOM, COLOR_BACKGROUND);
-                R_DrawText(10, 10, 1, "Saved Api Key", COLOR_TEXT_NORMAL);
-
-                R_DrawText(10, 40, 0.5f, currentApiKey, COLOR_TEXT_HIGHLIGHT);
                 
-                R_DrawText(10, 100, 1, "[A] Edit", COLOR_TEXT_NORMAL);
-                R_DrawText(10, 130, 1, "[B] Back", COLOR_TEXT_NORMAL);
-                break;                
+            case STATE_APIKEY:
+                ApiManager_Draw();
+                break;
+                
             case STATE_GEMINI:
                 GeminiApp_Draw();
                 break;
+                
             case STATE_SETTINGS:
                 Settings_Draw();
                 break;
