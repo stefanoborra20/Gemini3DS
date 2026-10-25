@@ -182,7 +182,7 @@ endif
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).3dsx $(OUTPUT).smdh $(TARGET).elf $(GFXBUILD)
+	@rm -fr $(BUILD) $(TARGET).3dsx $(TARGET).cia $(OUTPUT).smdh $(TARGET).elf $(GFXBUILD)
 
 #---------------------------------------------------------------------------------
 $(GFXBUILD)/%.t3x	$(BUILD)/%.h	:	%.t3s
@@ -196,7 +196,12 @@ else
 #---------------------------------------------------------------------------------
 # main targets
 #---------------------------------------------------------------------------------
+all: $(OUTPUT).3dsx $(OUTPUT).cia
+
 $(OUTPUT).3dsx	:	$(OUTPUT).elf $(_3DSXDEPS)
+
+$(OUTPUT).cia	:	$(OUTPUT).elf $(_3DSXDEPS)
+	@makerom -f cia -target t -desc app:4 -DAPP_ROMFS="$(TOPDIR)/romfs" -o $@ -elf $< -icon $(OUTPUT).smdh -rsf $(TOPDIR)/Gemini3DS.rsf
 
 $(OFILES_SOURCES) : $(HFILES)
 
