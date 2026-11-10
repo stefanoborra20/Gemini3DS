@@ -19,7 +19,7 @@ int ApiManager_GetActiveKeyIndex();
 void ApiManager_SetActiveKeyIndex(int index);
 void ApiManager_UpdateCurrentKey(const char *newKey);
 
-void ApiManager_Update(u32 kDown);
+bool ApiManager_Update(u32 kDown);
 void ApiManager_Draw();
 
 #endif

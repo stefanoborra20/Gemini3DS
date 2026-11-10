@@ -55,9 +55,26 @@ static void CountKeysInFile() {
     fclose(f);
 }
 
+static void MaskKey(const char *key, char *out, size_t n) {
+    size_t len = key ? strlen(key) : 0;
+
+    if (len == 0) {
+        snprintf(out, n, "NONE");
+        return;
+    }
+
+    if (len <= 8) {
+        snprintf(out, n, "****");
+        return;
+    }
+
+    snprintf(out, n, "%.4s****%s", key, key + len - 4);
+}
+
 void ApiManager_Init() {
     CountKeysInFile();
     current_index = 0;
+    printApiKeyErr = (keys_num == 0);
 
     if (keys_num > 0) {
         ReadLineFromFile(0, active_key);
@@ -113,13 +130,13 @@ void ApiManager_SetActiveKeyIndex(int index) {
 
 void ApiManager_AddNewKey(const char* newKey) {
     FILE *f = fopen(KEY_FILE_PATH, "a");
-    if (!f) f = fopen(KEY_FILE_PATH, "w"); 
-    
+    if (!f) f = fopen(KEY_FILE_PATH, "w");
+
     if (f) {
         fprintf(f, "%s\n", newKey);
         fclose(f);
     }
-    
+
     CountKeysInFile();
     ApiManager_SetActiveKeyIndex(keys_num - 1);
 }
@@ -127,14 +144,14 @@ void ApiManager_AddNewKey(const char* newKey) {
 void ApiManager_UpdateCurrentKey(const char* newKey) {
     FILE *f = fopen(KEY_FILE_PATH, "r");
     FILE *temp = fopen("temp_keys.txt", "w");
-    
+
     if (!temp) {
         if (f) fclose(f);
         return;
     }
-    
+
     bool is_deleting = (strlen(newKey) == 0);
-    
+
     if (f) {
         char lineBuffer[128];
         int currentLine = 0;
@@ -146,7 +163,7 @@ void ApiManager_UpdateCurrentKey(const char* newKey) {
                         fprintf(temp, "%s\n", newKey);
                     }
                 } else {
-                    fprintf(temp, "%s\n", lineBuffer); 
+                    fprintf(temp, "%s\n", lineBuffer);
                 }
                 currentLine++;
             }
@@ -155,14 +172,14 @@ void ApiManager_UpdateCurrentKey(const char* newKey) {
     } else {
         if (!is_deleting) fprintf(temp, "%s\n", newKey);
     }
-    
+
     fclose(temp);
-    
+
     remove(KEY_FILE_PATH);
     rename("temp_keys.txt", KEY_FILE_PATH);
-    
+
     CountKeysInFile();
-    
+
     if (keys_num == 0) {
         active_key[0] = '\0';
         next_key[0] = '\0';
@@ -171,71 +188,123 @@ void ApiManager_UpdateCurrentKey(const char* newKey) {
         if (current_index >= keys_num) current_index = keys_num - 1;
         ApiManager_SetActiveKeyIndex(current_index);
     }
+
+    printApiKeyErr = (keys_num == 0);
 }
 
-void ApiManager_Update(u32 kDown) {
-    if (kDown & KEY_L) ApiManager_SetActiveKeyIndex(ApiManager_GetActiveKeyIndex() - 1);
-    if (kDown & KEY_R) ApiManager_SetActiveKeyIndex(ApiManager_GetActiveKeyIndex() + 1);
-    
-    if (kDown & KEY_Y) ApiManager_ToggleRotation(!ApiManager_IsRotationEnabled());
+static void SwitchKey(int delta) {
+    if (keys_num <= 1) return;
 
-    // EDIT CURRENT KEY
-    if (kDown & KEY_A) {
-        char tempBuffer[API_KEY_MAX_LEN];
-        snprintf(tempBuffer, API_KEY_MAX_LEN, "%s", active_key);
-        if (strcmp(tempBuffer, "No Api Key") == 0) tempBuffer[0] = '\0'; 
+    int index = current_index + delta;
+    if (index < 0) index = keys_num - 1;
+    if (index >= keys_num) index = 0;
 
-        if (R_OpenKeyboard("Edit Key (Clear text to delete)", tempBuffer, API_KEY_MAX_LEN)) {
-            ApiManager_UpdateCurrentKey(tempBuffer);
-            printApiKeyErr = false;
-        }
-    } 
-    
-    // ADD NEW KEY
-    if (kDown & KEY_X) {
-        char tempBuffer[API_KEY_MAX_LEN] = "";
-        
-        if (R_OpenKeyboard("Add New Gemini API Key", tempBuffer, API_KEY_MAX_LEN)) {
-            if (strlen(tempBuffer) > 0) {
-                ApiManager_AddNewKey(tempBuffer);
-                printApiKeyErr = false;
-            }
+    ApiManager_SetActiveKeyIndex(index);
+}
+
+static void EditCurrentKey(void) {
+    char tempBuffer[API_KEY_MAX_LEN];
+
+    if (keys_num > 0) {
+        snprintf(tempBuffer, sizeof(tempBuffer), "%s", active_key);
+    } else {
+        tempBuffer[0] = '\0';
+    }
+
+    if (R_OpenKeyboard("Edit key (clear text to delete)", tempBuffer, sizeof(tempBuffer))) {
+        ApiManager_UpdateCurrentKey(tempBuffer);
+    }
+}
+
+static void AddNewKey(void) {
+    char tempBuffer[API_KEY_MAX_LEN] = "";
+
+    if (R_OpenKeyboard("Add new Gemini API key", tempBuffer, sizeof(tempBuffer))) {
+        if (strlen(tempBuffer) > 0) {
+            ApiManager_AddNewKey(tempBuffer);
+            printApiKeyErr = (ApiManager_GetTotalKeys() == 0);
         }
     }
+}
+
+bool ApiManager_Update(u32 kDown) {
+    touchPosition touch;
+    bool touchDown = false;
+    bool touchUp = false;
+    R_UpdateTouch(&touch, &touchDown, &touchUp);
+
+    if (touchDown) {
+        if (R_TouchInRect(&touch, 8.0f, 34.0f, 148.0f, 44.0f)) {
+            SwitchKey(-1);
+            return false;
+        }
+        if (R_TouchInRect(&touch, 164.0f, 34.0f, 148.0f, 44.0f)) {
+            SwitchKey(1);
+            return false;
+        }
+        if (R_TouchInRect(&touch, 8.0f, 86.0f, 148.0f, 44.0f)) {
+            ApiManager_ToggleRotation(!ApiManager_IsRotationEnabled());
+            return false;
+        }
+        if (R_TouchInRect(&touch, 164.0f, 86.0f, 148.0f, 44.0f)) {
+            EditCurrentKey();
+            return false;
+        }
+        if (R_TouchInRect(&touch, 8.0f, 138.0f, 148.0f, 44.0f)) {
+            AddNewKey();
+            return false;
+        }
+        if (R_TouchInRect(&touch, 164.0f, 138.0f, 148.0f, 44.0f)) {
+            return true;
+        }
+    }
+
+    if (kDown & KEY_L) SwitchKey(-1);
+    if (kDown & KEY_R) SwitchKey(1);
+    if (kDown & KEY_Y) ApiManager_ToggleRotation(!ApiManager_IsRotationEnabled());
+    if (kDown & KEY_A) EditCurrentKey();
+    if (kDown & KEY_X) AddNewKey();
+    if (kDown & KEY_B) return true;
+
+    return false;
 }
 
 void ApiManager_Draw() {
+    char masked[48];
+    char page[32];
+
+    /* ------------------------------------------------------------------ */
+    /* Top screen                                                         */
+    /* ------------------------------------------------------------------ */
+    R_SetTarget(SCREEN_TOP);
+    R_ClearScreen(SCREEN_TOP, COLOR_BACKGROUND);
+
+    if (keys_num > 0) {
+        MaskKey(active_key, masked, sizeof(masked));
+        R_DrawTextCentered(0.0f, 104.0f, SCREEN_TOP_WIDTH, 0.85f,
+                           masked, COLOR_TEXT_HIGHLIGHT);
+
+        snprintf(page, sizeof(page), "%d/%d", current_index + 1, keys_num);
+        R_DrawTextRight(390.0f, 16.0f, 0.45f, page, COLOR_TEXT_DIM);
+    } else {
+        R_DrawTextCentered(0.0f, 104.0f, SCREEN_TOP_WIDTH, 0.85f,
+                           "NO KEY", COLOR_ALERT);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Bottom screen                                                      */
+    /* ------------------------------------------------------------------ */
     R_SetTarget(SCREEN_BOTTOM);
     R_ClearScreen(SCREEN_BOTTOM, COLOR_BACKGROUND);
-    
-    char headerMsg[64];
-    snprintf(headerMsg, 64, "Current Key: %d of %d", keys_num > 0 ? current_index + 1 : 0, keys_num);
-    R_DrawText(10, 10, 1.0f, headerMsg, COLOR_TEXT_NORMAL);
 
-    if (keys_num == 0) {
-        R_DrawText(10, 40, 0.5f, "No Api Keys saved. Press [X] to add one.", COLOR_TEXT_HIGHLIGHT);
-    } else {
-        int keyLen = strlen(active_key);
-        if (keyLen > 40) {
-            char line1[45];
-            char line2[64];
-            snprintf(line1, sizeof(line1), "%.40s", active_key); 
-            snprintf(line2, sizeof(line2), "%s", active_key + 40); 
-            
-            R_DrawText(10, 40, 0.5f, line1, COLOR_TEXT_HIGHLIGHT);
-            R_DrawText(10, 55, 0.5f, line2, COLOR_TEXT_HIGHLIGHT);
-        } else {
-            R_DrawText(10, 40, 0.5f, active_key, COLOR_TEXT_HIGHLIGHT);
-        }
-    }
-    
-    char rotMsg[64];
-    snprintf(rotMsg, 64, "Auto-Rotate: %s", auto_rotate_enabled ? "ON" : "OFF");
-    R_DrawText(10, 85, 0.8f, rotMsg, auto_rotate_enabled ? COLOR_TEXT_HIGHLIGHT : COLOR_TEXT_NORMAL);
-    
-    R_DrawText(10, 115, 0.8f, "[L/R] Switch Key", COLOR_TEXT_NORMAL);
-    R_DrawText(10, 135, 0.8f, "[Y] Toggle Auto-Rotate", COLOR_TEXT_NORMAL);
-    R_DrawText(10, 155, 0.8f, "[A] Edit/Delete Key", COLOR_TEXT_NORMAL); // Updated Label
-    R_DrawText(10, 175, 0.8f, "[X] Add New Key", COLOR_TEXT_NORMAL);
-    R_DrawText(10, 195, 0.8f, "[B] Back", COLOR_TEXT_NORMAL);
+    R_DrawButtonLeft(8.0f, 34.0f, 148.0f, 44.0f, "L", "PREV", BTN_NORMAL);
+    R_DrawButtonLeft(164.0f, 34.0f, 148.0f, 44.0f, "R", "NEXT", BTN_NORMAL);
+
+    R_DrawButtonLeft(8.0f, 86.0f, 148.0f, 44.0f, "Y", "ROTATE",
+                     auto_rotate_enabled ? BTN_SELECTED : BTN_NORMAL);
+    R_DrawButtonLeft(164.0f, 86.0f, 148.0f, 44.0f, "A", "EDIT", BTN_NORMAL);
+
+    R_DrawButtonLeft(8.0f, 138.0f, 148.0f, 44.0f, "X", "ADD",
+                     keys_num == 0 ? BTN_ACTIVE : BTN_NORMAL);
+    R_DrawButtonLeft(164.0f, 138.0f, 148.0f, 44.0f, "B", "BACK", BTN_NORMAL);
 }

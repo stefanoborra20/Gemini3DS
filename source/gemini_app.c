@@ -4,6 +4,8 @@
 #include "mic_system.h"
 #include "camera.h"
 #include "image_utils.h"
+#include "settings.h"
+#include "api_key_manager.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,20 +13,63 @@
 #define MAX_RESPONSE_LEN 8192
 #define MAX_PROMPT_LEN 256
 
+/* Top screen layout */
+#define BODY_X 6.0f
+#define BODY_Y 26.0f
+#define BODY_W 388.0f
+#define BODY_H 190.0f
+#define TEXT_X 14.0f
+#define TEXT_Y 32.0f
+#define TEXT_W 362.0f
+#define TEXT_CLIP_BOTTOM 214.0f
+#define TEXT_VIEW_H 182.0f
+#define ROLE_W 30.0f
+#define SCROLL_X 384.0f
+#define SCROLL_H 182.0f
+
+/* Bottom screen layout */
+#define BOT_PROMPT_X 8.0f
+#define BOT_PROMPT_Y 30.0f
+#define BOT_PROMPT_W 304.0f
+#define BOT_PROMPT_H 38.0f
+#define BOT_BTN_W 148.0f
+#define BOT_BTN_H 56.0f
+#define BOT_BTN_X1 8.0f
+#define BOT_BTN_X2 164.0f
+#define BOT_BTN_Y1 78.0f
+#define BOT_BTN_Y2 142.0f
+
+/* Camera bottom-screen buttons */
+#define CAM_PREVIEW_SHUTTER_Y 40.0f
+#define CAM_PREVIEW_EXIT_Y 106.0f
+#define CAM_CAPTURED_USE_Y 34.0f
+#define CAM_CAPTURED_RETAKE_Y 90.0f
+#define CAM_CAPTURED_EXIT_Y 146.0f
+#define CAM_BTN_H 48.0f
+
 static char responseText[MAX_RESPONSE_LEN];
 static char promptBuffer[MAX_PROMPT_LEN];
+static char lastPrompt[MAX_PROMPT_LEN];
 static bool isThinking = false;
 static float scrollY;
 static float totalTextHeight;
 static const float scrollSpeed = 6.0f;
 static float maxScrollY;
+static bool wasTalkHeld = false;
+static bool talkTouchActive = false;
+static int recFrame = 0;
 
 void GeminiApp_Init() {
-    snprintf(responseText, MAX_RESPONSE_LEN, "://Gemini3DS/Insert prompt");
+    snprintf(responseText, MAX_RESPONSE_LEN,
+             "Welcome to Gemini3DS. Press A to write a prompt, hold Y to talk, or press X to use the camera.");
+    lastPrompt[0] = '\0';
     isThinking = false;
     scrollY = 0.0f;
     totalTextHeight = 0.0f;
     maxScrollY = 0.0f;
+    wasTalkHeld = false;
+    talkTouchActive = false;
+    recFrame = 0;
 
     Net_SetStatusCallback(ForceDrawStatus);
 }
@@ -33,61 +78,167 @@ void GeminiApp_Exit() {
     Cam_Exit();
 }
 
-void ForceDrawStatus(const char *message) {
-    R_BeginFrame();
+/* -------------------------------------------------------------------------
+ * Status screens
+ * ---------------------------------------------------------------------- */
+
+static void Draw_WorkingScreen(const char *message) {
+    if (!message || !*message) message = "://WORKING";
+
+    /* Top screen */
     R_SetTarget(SCREEN_TOP);
     R_ClearScreen(SCREEN_TOP, COLOR_BACKGROUND);
-    R_DrawText(10, 10, 1, message, COLOR_TEXT_HIGHLIGHT);
+
+    R_DrawIcon(SCREEN_TOP_WIDTH / 2 - 10.0f, 58.0f, 20.0f,
+               ICON_SPARKLE, COLOR_ACCENT);
+    R_DrawTextCentered(0.0f, 104.0f, SCREEN_TOP_WIDTH, 0.7f,
+                       message, COLOR_TEXT_HIGHLIGHT);
+
+    /* Bottom screen */
+    R_SetTarget(SCREEN_BOTTOM);
+    R_ClearScreen(SCREEN_BOTTOM, COLOR_BACKGROUND);
+
+    R_DrawTextCentered(0.0f, 110.0f, SCREEN_BOTTOM_WIDTH, 0.5f,
+                       "PLEASE WAIT", COLOR_TEXT_DIM);
+}
+
+static void Draw_RecordingScreen(void) {
+    recFrame++;
+
+    u32 bytes = Mic_GetWavSize();
+    u32 audioBytes = (bytes > 44) ? (bytes - 44) : 0;
+    u32 tenths = audioBytes / 3272;
+    char timeBuf[32];
+    snprintf(timeBuf, sizeof(timeBuf), "%lu.%lu S",
+             (unsigned long)(tenths / 10), (unsigned long)(tenths % 10));
+
+    float progress = (float)audioBytes / (32720.0f * 10.0f);
+    if (progress < 0.0f) progress = 0.0f;
+    if (progress > 1.0f) progress = 1.0f;
+
+    /* Top screen */
+    R_SetTarget(SCREEN_TOP);
+    R_ClearScreen(SCREEN_TOP, COLOR_BACKGROUND);
+
+    R_DrawIcon(SCREEN_TOP_WIDTH / 2 - 12.0f, 58.0f, 24.0f, ICON_MIC, COLOR_ALERT);
+
+    R_DrawRectSolid(SCREEN_TOP_WIDTH / 2 - 34.0f, 100.0f, 0.5f, 6.0f, 6.0f,
+                    (recFrame / 15) % 2 ? COLOR_ALERT : COLOR_TEXT_DIM);
+    R_DrawText(SCREEN_TOP_WIDTH / 2 - 22.0f, 96.0f, 0.8f, "REC", COLOR_ALERT);
+    R_DrawTextCentered(0.0f, 124.0f, SCREEN_TOP_WIDTH, 0.7f,
+                       timeBuf, COLOR_TEXT_HIGHLIGHT);
+
+    R_DrawRectSolid(80.0f, 164.0f, 0.5f, 240.0f, 3.0f, COLOR_SCROLL_TRACK);
+    R_DrawRectSolid(80.0f, 164.0f, 0.5f, 240.0f * progress, 3.0f, COLOR_ALERT);
+
+    /* Bottom screen */
+    R_SetTarget(SCREEN_BOTTOM);
+    R_ClearScreen(SCREEN_BOTTOM, COLOR_BACKGROUND);
+
+    R_DrawTextCentered(0.0f, 110.0f, SCREEN_BOTTOM_WIDTH, 0.5f,
+                       "RELEASE TO SEND", COLOR_TEXT_DIM);
+}
+
+void ForceDrawStatus(const char *message) {
+    R_BeginFrame();
+
+    if (Mic_IsRecording()) {
+        Draw_RecordingScreen();
+    } else {
+        Draw_WorkingScreen(message);
+    }
+
     R_EndFrame();
     gspWaitForVBlank();
 }
 
-static void Handle_CameraState(u32 kDown, CamMode cam_mode) {
-    if (cam_mode == CAM_MODE_PREVIEW) {
-        Cam_UpdatePreview(); 
+/* -------------------------------------------------------------------------
+ * Input handlers
+ * ---------------------------------------------------------------------- */
 
-        if (kDown & KEY_A) {
-            Cam_FreezeFrame(); 
-        } else if (kDown & KEY_B) { 
-            Cam_StopPreview(); 
+static void Handle_CameraState(u32 kDown, CamMode cam_mode, bool touchDown,
+                               const touchPosition *touch) {
+    if (cam_mode == CAM_MODE_PREVIEW) {
+        Cam_UpdatePreview();
+
+        bool shutter = (kDown & KEY_A) ||
+                       (touchDown && R_TouchInRect(touch, 8.0f, CAM_PREVIEW_SHUTTER_Y,
+                                                   304.0f, 56.0f));
+        bool exit = (kDown & KEY_B) ||
+                    (touchDown && R_TouchInRect(touch, 8.0f, CAM_PREVIEW_EXIT_Y,
+                                                304.0f, 56.0f));
+
+        if (shutter) {
+            Cam_FreezeFrame();
+        } else if (exit) {
+            Cam_StopPreview();
         }
         return;
     }
-    
+
     if (cam_mode == CAM_MODE_CAPTURED) {
-        if (kDown & KEY_A) { // Confirm image
-            isThinking = true; 
-            ForceDrawStatus("://Converting to JPEG");
+        bool use = (kDown & KEY_A) ||
+                   (touchDown && R_TouchInRect(touch, 8.0f, CAM_CAPTURED_USE_Y,
+                                               304.0f, CAM_BTN_H));
+        bool retake = (kDown & KEY_X) ||
+                      (touchDown && R_TouchInRect(touch, 8.0f, CAM_CAPTURED_RETAKE_Y,
+                                                  304.0f, CAM_BTN_H));
+        bool exit = (kDown & KEY_B) ||
+                    (touchDown && R_TouchInRect(touch, 8.0f, CAM_CAPTURED_EXIT_Y,
+                                                304.0f, CAM_BTN_H));
+
+        if (use) {
+            isThinking = true;
+            ForceDrawStatus("://CONVERTING JPEG");
+
             size_t jpegSize = 0;
             u8 *jpegBuffer = Encode_JPEG(Cam_GetBuffer(), 400, 240, 80, &jpegSize);
 
             if (jpegBuffer) {
                 promptBuffer[0] = '\0';
+
                 if (R_OpenKeyboard("Ask about this image...", promptBuffer, MAX_PROMPT_LEN)) {
-                    isThinking=true;
-                    ForceDrawStatus("://Sending image...");
+                    if (promptBuffer[0]) {
+                        snprintf(lastPrompt, sizeof(lastPrompt), "[IMAGE] %s", promptBuffer);
+                    } else {
+                        snprintf(lastPrompt, sizeof(lastPrompt), "[IMAGE]");
+                    }
 
-                    const char *finalPromt = (strlen(promptBuffer) > 0) ? promptBuffer : "Describe this photo made from my Nintendo 3DS.";
+                    isThinking = true;
+                    ForceDrawStatus("://SENDING IMAGE");
 
-                    Net_QueryGeminiImage(finalPromt, jpegBuffer, jpegSize, responseText, MAX_RESPONSE_LEN);
+                    const char *finalPrompt = (strlen(promptBuffer) > 0)
+                                                  ? promptBuffer
+                                                  : "Describe this photo made from my Nintendo 3DS.";
 
+                    Net_QueryGeminiImage(finalPrompt, jpegBuffer, jpegSize,
+                                         responseText, MAX_RESPONSE_LEN);
                     R_ClearText(responseText);
-                    isThinking=false;
+                    scrollY = 0.0f;
+                    isThinking = false;
                 } else {
                     snprintf(responseText, MAX_RESPONSE_LEN, "Image prompt cancelled.");
+                    lastPrompt[0] = '\0';
+                    scrollY = 0.0f;
                 }
+
                 free(jpegBuffer);
             } else {
                 snprintf(responseText, MAX_RESPONSE_LEN, "Error: Failed to compress JPEG.");
+                lastPrompt[0] = '\0';
+                scrollY = 0.0f;
             }
-            
+
             Cam_StopPreview();
+            R_SuppressTouch();
             isThinking = false;
-        } else if (kDown & KEY_X) { // Retake image
+        } else if (retake) {
             Cam_ResumePreview();
-        } else if (kDown & KEY_B) { // Cancel and exit camera entirely
+        } else if (exit) {
             Cam_StopPreview();
             snprintf(responseText, MAX_RESPONSE_LEN, "Camera cancelled.");
+            lastPrompt[0] = '\0';
+            scrollY = 0.0f;
         }
     }
 }
@@ -96,152 +247,234 @@ static void Handle_Scrolling(u32 kHeld) {
     if (kHeld & KEY_DOWN) scrollY += scrollSpeed;
     if (kHeld & KEY_UP) scrollY -= scrollSpeed;
 
-    maxScrollY = totalTextHeight - SCREEN_TOP_HEIGHT + 20.0f; 
-    if (maxScrollY < 0) maxScrollY = 0;
-    if (scrollY < 0) scrollY = 0;
+    maxScrollY = totalTextHeight - TEXT_VIEW_H;
+    if (maxScrollY < 0.0f) maxScrollY = 0.0f;
+    if (scrollY < 0.0f) scrollY = 0.0f;
     if (scrollY > maxScrollY) scrollY = maxScrollY;
 }
 
-static void Handle_TextPromt(u32 kDown) {
-    if (kDown & KEY_A) {
-        promptBuffer[0] = '\0';
+static void Handle_TextPrompt(bool pressed) {
+    if (!pressed) return;
 
-        if (R_OpenKeyboard("Ask Gemini...", promptBuffer, MAX_PROMPT_LEN)) {
-            isThinking = true;
-            
-            ForceDrawStatus("://Thinking...");
+    promptBuffer[0] = '\0';
 
-            Net_QueryGemini(promptBuffer, responseText, MAX_RESPONSE_LEN);
-            R_ClearText(responseText);
-            isThinking = false;
-        }
+    if (R_OpenKeyboard("Ask Gemini...", promptBuffer, MAX_PROMPT_LEN)) {
+        snprintf(lastPrompt, sizeof(lastPrompt), "%s", promptBuffer);
+
+        isThinking = true;
+        ForceDrawStatus("://THINKING");
+
+        Net_QueryGemini(promptBuffer, responseText, MAX_RESPONSE_LEN);
+        R_ClearText(responseText);
+        scrollY = 0.0f;
+        isThinking = false;
+        R_SuppressTouch();
     }
 }
 
-static void Handle_AudioPromt(u32 kHeld, u32 kUp) {
-    if (kHeld & KEY_Y) Mic_StartRecording();
-
-    if (Mic_IsRecording())  {
-        Mic_Update();
-        ForceDrawStatus("://Recording...");
+static void Handle_AudioPrompt(bool held, bool up) {
+    if (held && !Mic_IsRecording()) {
+        Mic_StartRecording();
     }
 
-    if (kUp & KEY_Y) {
-        Mic_StopRecording();
+    if (Mic_IsRecording()) {
+        Mic_Update();
+    }
 
-        /* Check if audio is at least ~= 0.5s */
-        if (Mic_GetWavSize() > 16300) { 
-            isThinking = true;
+    if (!up) return;
 
-            ForceDrawStatus("://Sending audio...");
+    if (!Mic_IsRecording()) return;
 
-            const char *voicePrompt = 
+    Mic_StopRecording();
+
+    /* Check if audio is at least ~= 0.5s */
+    if (Mic_GetWavSize() > 16300) {
+        snprintf(lastPrompt, sizeof(lastPrompt), "[VOICE]");
+
+        isThinking = true;
+        ForceDrawStatus("://SENDING AUDIO");
+
+        const char *voicePrompt =
             "Roleplay as a helpful voice assistant on a Nintendo 3DS. "
             "The attached audio is a direct question or statement from the user. "
             "Do not describe the audio. Do not transcribe what was said. "
             "Listen to the audio and reply directly and naturally to the user.";
 
-            Net_QueryGeminiAudio(voicePrompt, Mic_GetWavBuffer(), Mic_GetWavSize(), responseText, MAX_RESPONSE_LEN);
-            R_ClearText(responseText);
-            isThinking = false;
-        }
+        Net_QueryGeminiAudio(voicePrompt, Mic_GetWavBuffer(), Mic_GetWavSize(),
+                             responseText, MAX_RESPONSE_LEN);
+        R_ClearText(responseText);
+        scrollY = 0.0f;
+        isThinking = false;
+        R_SuppressTouch();
+    } else {
+        snprintf(responseText, MAX_RESPONSE_LEN,
+                 "Voice prompt too short. Hold Y a little longer.");
+        lastPrompt[0] = '\0';
+        scrollY = 0.0f;
     }
 }
 
-void GeminiApp_Update(u32 kDown) {
-    if (isThinking) return;
+bool GeminiApp_Update(u32 kDown) {
+    if (isThinking) return false;
 
     u32 kHeld = hidKeysHeld();
-    u32 kUp = hidKeysUp();
+
+    touchPosition touch;
+    bool touchDown = false;
+    bool touchUp = false;
+    bool touching = R_UpdateTouch(&touch, &touchDown, &touchUp);
+    (void)touchUp;
+
+    bool inTalk = R_TouchInRect(&touch, BOT_BTN_X2, BOT_BTN_Y1, BOT_BTN_W, BOT_BTN_H);
+    if (touchDown && inTalk) talkTouchActive = true;
+    if (!touching || !inTalk) talkTouchActive = false;
+
+    bool talkHeld = (kHeld & KEY_Y) || talkTouchActive;
+    bool talkUp = wasTalkHeld && !talkHeld;
+    wasTalkHeld = talkHeld;
+
     CamMode cam_mode = Cam_GetMode();
 
     if (cam_mode != CAM_MODE_OFF) {
-        Handle_CameraState(kDown, cam_mode);
-        return;
+        Handle_CameraState(kDown, cam_mode, touchDown, &touch);
+        return false;
     }
 
-    if (kDown & KEY_X) {
+    if (Mic_IsRecording()) {
+        Handle_AudioPrompt(talkHeld, talkUp);
+        return false;
+    }
+
+    bool ask = (kDown & KEY_A) ||
+               (touchDown && R_TouchInRect(&touch, BOT_BTN_X1, BOT_BTN_Y1,
+                                            BOT_BTN_W, BOT_BTN_H));
+    bool cam = (kDown & KEY_X) ||
+               (touchDown && R_TouchInRect(&touch, BOT_BTN_X1, BOT_BTN_Y2,
+                                            BOT_BTN_W, BOT_BTN_H));
+    bool back = (kDown & KEY_B) ||
+                (touchDown && R_TouchInRect(&touch, BOT_BTN_X2, BOT_BTN_Y2,
+                                             BOT_BTN_W, BOT_BTN_H));
+
+    if (back) return true;
+    if (cam) {
         Cam_StartPreview();
-        return;
+        return false;
     }
 
     Handle_Scrolling(kHeld);
-    Handle_TextPromt(kDown);
-    Handle_AudioPromt(kHeld, kUp);
+    Handle_TextPrompt(ask);
+    Handle_AudioPrompt(talkHeld, talkUp);
+
+    return false;
 }
 
-static void Draw_TopScreen(CamMode cam_mode){
-    /* Top screen */
+/* -------------------------------------------------------------------------
+ * Drawing
+ * ---------------------------------------------------------------------- */
+
+static void Draw_CameraOverlay(CamMode cam_mode) {
+    const char *status = (cam_mode == CAM_MODE_PREVIEW) ? "LIVE" : "CAPTURED";
+
+    R_DrawRectSolid(12.0f, 12.0f, 0.5f, 6.0f, 6.0f,
+                    cam_mode == CAM_MODE_PREVIEW ? COLOR_ALERT : COLOR_ACCENT);
+    R_DrawText(24.0f, 8.0f, 0.5f, status, COLOR_TEXT_HIGHLIGHT);
+}
+
+static void Draw_TopScreen(CamMode cam_mode) {
     R_SetTarget(SCREEN_TOP);
     R_ClearScreen(SCREEN_TOP, COLOR_BACKGROUND);
 
-    if (cam_mode != CAM_MODE_OFF){
+    if (cam_mode != CAM_MODE_OFF) {
         R_DrawCameraFeed(Cam_GetBuffer());
-        
-        if (cam_mode == CAM_MODE_PREVIEW) {
-            R_DrawText(10, 10, 1, "://Live Camera Preview", COLOR_TEXT_NORMAL);
-        } else {
-            R_DrawText(10, 10, 1, "://Photo Captured", COLOR_TEXT_NORMAL);
+        Draw_CameraOverlay(cam_mode);
+        return;
+    }
+
+    float promptHeight = 0.0f;
+    float responseHeight = 0.0f;
+    float cursorY = TEXT_Y - scrollY;
+
+    if (lastPrompt[0]) {
+        if (cursorY >= TEXT_Y && cursorY + 16.0f <= TEXT_CLIP_BOTTOM) {
+            R_DrawText(TEXT_X, cursorY + 2.0f, 0.5f, "YOU", COLOR_ACCENT);
         }
-    } else {
 
-        if (isThinking) {
-            R_DrawText(10, 10, 1, "://Thinking...", COLOR_TEXT_HIGHLIGHT);
-        }
-        else if (Mic_IsRecording()) {
-            R_DrawText(10, 10, 1, "://Recording...", COLOR_TEXT_HIGHLIGHT);
+        R_DrawTextWrappedClipped(TEXT_X + ROLE_W, cursorY, TEXT_W - ROLE_W, 0.7f,
+                                 lastPrompt, COLOR_TEXT_NORMAL, 2.0f,
+                                 TEXT_Y, TEXT_CLIP_BOTTOM, &promptHeight);
 
-            char audioSize[32];
-            snprintf(audioSize, 32, "%lu Bytes", Mic_GetWavSize());
-            R_DrawText(10, 30, 0.6f, audioSize, COLOR_TEXT_NORMAL);
-        }
-        else {
+        cursorY += promptHeight + 10.0f;
 
-            float startY = 10.0f;
-            float drawY = startY - scrollY;
-            R_DrawTextWrapped(10.0f, drawY, SCREEN_TOP_WIDTH - 20.0f, responseText, COLOR_TEXT_NORMAL, &totalTextHeight); 
-
-            // Draw side bar
-            if (totalTextHeight > SCREEN_TOP_HEIGHT) {
-                float barHeight = (SCREEN_TOP_HEIGHT / totalTextHeight) * SCREEN_TOP_HEIGHT;
-                if (barHeight < 20) barHeight = 20;
-
-                float barPos = (scrollY / (totalTextHeight - SCREEN_TOP_HEIGHT)) * (SCREEN_TOP_HEIGHT - barHeight);
-
-                R_SetTarget(SCREEN_TOP);
-                R_DrawRectSolid(SCREEN_TOP_WIDTH - 5.0f, barPos, 0.5f, 4.0f, barHeight, COLOR_SCROLL_BAR);
-            }
+        if (cursorY - 6.0f >= TEXT_Y && cursorY - 6.0f <= TEXT_CLIP_BOTTOM) {
+            R_DrawHLine(TEXT_X + ROLE_W, cursorY - 6.0f, TEXT_W - ROLE_W, COLOR_BORDER);
         }
     }
 
+    if (cursorY >= TEXT_Y && cursorY + 16.0f <= TEXT_CLIP_BOTTOM) {
+        R_DrawText(TEXT_X, cursorY + 2.0f, 0.5f, "GEM", COLOR_TEXT_HIGHLIGHT);
+    }
+
+    if (responseText[0]) {
+        R_DrawTextWrappedClipped(TEXT_X + ROLE_W, cursorY, TEXT_W - ROLE_W, 0.7f,
+                                 responseText, COLOR_TEXT_NORMAL, 2.0f,
+                                 TEXT_Y, TEXT_CLIP_BOTTOM, &responseHeight);
+    } else {
+        R_DrawText(TEXT_X + ROLE_W, cursorY, 0.7f, "NO RESPONSE", COLOR_TEXT_DIM);
+        responseHeight = 0.0f;
+    }
+
+    totalTextHeight = promptHeight + (lastPrompt[0] ? 10.0f : 0.0f) + responseHeight;
+    maxScrollY = totalTextHeight - TEXT_VIEW_H;
+    if (maxScrollY < 0.0f) maxScrollY = 0.0f;
+    if (scrollY > maxScrollY) scrollY = maxScrollY;
+
+    R_DrawScrollbar(SCROLL_X, TEXT_Y, SCROLL_H, totalTextHeight, TEXT_VIEW_H, scrollY);
 }
 
 static void Draw_BottomScreen(CamMode cam_mode) {
-    /* Bottom screen */
     R_SetTarget(SCREEN_BOTTOM);
     R_ClearScreen(SCREEN_BOTTOM, COLOR_BACKGROUND);
 
     if (cam_mode == CAM_MODE_PREVIEW) {
-        R_DrawText(10, 20, 1, "[A] Capture Photo", COLOR_TEXT_HIGHLIGHT);
-        R_DrawText(10, 60, 1, "[B] Exit Camera", COLOR_TEXT_NORMAL);
-    } 
-    else if (cam_mode == CAM_MODE_CAPTURED) {
-        R_DrawText(10, 20, 1, "[A] Use Image", COLOR_TEXT_HIGHLIGHT);
-        R_DrawText(10, 60, 1, "[X] Retake Photo", COLOR_TEXT_NORMAL);
-        R_DrawText(10, 100, 1, "[B] Exit Camera", COLOR_TEXT_NORMAL); 
-    } 
-    else {
-        R_DrawText(10, 5, 1, "[A] Text Promt", COLOR_TEXT_NORMAL);
-        R_DrawText(10, 35, 1, "[Y] Audio Promt (Hold)", COLOR_TEXT_NORMAL);
-        R_DrawText(10, 65, 1, "[X] Open Camera", COLOR_TEXT_NORMAL);
-        R_DrawText(10, 95, 1, "[B] Back", COLOR_TEXT_NORMAL);
-    }   
+        R_DrawButton(8.0f, CAM_PREVIEW_SHUTTER_Y, 304.0f, 56.0f,
+                     "A", "SHUTTER", ICON_NONE, BTN_NORMAL);
+        R_DrawButton(8.0f, CAM_PREVIEW_EXIT_Y, 304.0f, 56.0f,
+                     "B", "EXIT", ICON_NONE, BTN_NORMAL);
+        return;
+    }
+
+    if (cam_mode == CAM_MODE_CAPTURED) {
+        R_DrawButton(8.0f, CAM_CAPTURED_USE_Y, 304.0f, CAM_BTN_H,
+                     "A", "USE IMAGE", ICON_NONE, BTN_NORMAL);
+        R_DrawButton(8.0f, CAM_CAPTURED_RETAKE_Y, 304.0f, CAM_BTN_H,
+                     "X", "RETAKE", ICON_NONE, BTN_NORMAL);
+        R_DrawButton(8.0f, CAM_CAPTURED_EXIT_Y, 304.0f, CAM_BTN_H,
+                     "B", "EXIT", ICON_NONE, BTN_NORMAL);
+        return;
+    }
+
+    if (lastPrompt[0]) {
+        R_DrawTextEllipsized(14.0f, 24.0f, 292.0f, 0.55f,
+                             lastPrompt, COLOR_TEXT_DIM);
+    }
+
+    R_DrawButtonLeft(BOT_BTN_X1, BOT_BTN_Y1, BOT_BTN_W, BOT_BTN_H,
+                     "A", "ASK", BTN_NORMAL);
+    R_DrawButtonLeft(BOT_BTN_X2, BOT_BTN_Y1, BOT_BTN_W, BOT_BTN_H,
+                     "Y", "TALK", Mic_IsRecording() ? BTN_ACTIVE : BTN_NORMAL);
+    R_DrawButtonLeft(BOT_BTN_X1, BOT_BTN_Y2, BOT_BTN_W, BOT_BTN_H,
+                     "X", "CAMERA", BTN_NORMAL);
+    R_DrawButtonLeft(BOT_BTN_X2, BOT_BTN_Y2, BOT_BTN_W, BOT_BTN_H,
+                     "B", "BACK", BTN_NORMAL);
 }
 
 void GeminiApp_Draw() {
+    if (Mic_IsRecording()) {
+        Draw_RecordingScreen();
+        return;
+    }
+
     CamMode cam_mode = Cam_GetMode();
     Draw_TopScreen(cam_mode);
     Draw_BottomScreen(cam_mode);
 }
-
-

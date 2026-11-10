@@ -32,6 +32,8 @@ int init() {
 } 
 
 void quit() {
+    Cam_Exit();
+    Mic_StopRecording();
     R_Exit();
     Mic_Exit();
     Net_Exit();
@@ -69,26 +71,21 @@ int main(int argc, char **argv) {
                 
             case STATE_GEMINI:
             {
-                CamMode mode_before_update = Cam_GetMode();
-                GeminiApp_Update(kDown);
-
-                if ((kDown & KEY_B) && mode_before_update == CAM_MODE_OFF) {
-                    GeminiApp_Exit(); 
+                if (GeminiApp_Update(kDown)) {
+                    GeminiApp_Exit();
                     state = STATE_MENU;
                 }
                 break;
             }
                 
             case STATE_APIKEY: 
-                ApiManager_Update(kDown);
-                if (kDown & KEY_B) {
+                if (ApiManager_Update(kDown)) {
                     state = STATE_MENU;
                 }
                 break;
                 
             case STATE_SETTINGS:
-                Settings_Update(kDown); 
-                if (kDown & KEY_B) {
+                if (Settings_Update(kDown)) {
                     state = STATE_MENU;
                 } 
                 break;
@@ -100,10 +97,6 @@ int main(int argc, char **argv) {
         switch (state) {
             case STATE_MENU:
                 Menu_Draw();
-                if (printApiKeyErr) {
-                    R_SetTarget(SCREEN_BOTTOM);
-                    R_DrawText(10, 5, 1, "No api key inserted", COLOR_TEXT_HIGHLIGHT);
-                }
                 break;
                 
             case STATE_APIKEY:

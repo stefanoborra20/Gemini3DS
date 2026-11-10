@@ -40,12 +40,13 @@ struct SettingOption {
 
 void Settings_Init();
 
-void Settings_Update(u32 kDown);
+bool Settings_Update(u32 kDown);
 
 void Settings_Draw();
 
 // Public getters
 const char* Settings_GetModel();
+const char* Settings_GetModelLabel();
 float Settings_GetTemperature();
 int Settings_GetMaxTokens();
 
