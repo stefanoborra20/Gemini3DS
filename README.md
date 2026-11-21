@@ -6,10 +6,19 @@
 
 ## 📥 Setup
 
-1.  **Download:** Grab the latest `.3dsx` from the [Releases Page](../../releases).
-2.  **Install:** Copy to `/3ds/gemini/` on your SD card.
-3.  **Launch:** Launch the app via Homebrew Launcher
-4.  **API Key:**  Copy your API Key inside the app, a file that stores it will be generated on your SD card.
+Download the latest release from the [Releases Page](../../releases), then pick one of the two options below.
+
+### Option 1: `.3dsx`
+
+1. Copy `Gemini3DS.3dsx` to `/3ds/gemini/` on your SD card.
+2. Launch it from the Homebrew Launcher.
+3. Enter your API key inside the app. It is saved to `gemini_api_key.txt` on the SD card.
+
+### Option 2: `.cia`
+
+1. Copy `Gemini3DS.cia` to a folder on your SD card, for example `/3ds/cias/`.
+2. Open **FBI** → **SD** → select `Gemini3DS.cia` → **Install**.
+3. Launch Gemini3DS from the Home Menu and enter your API key.
 
 ## Screenshots
 <img width="400" height="240" alt="Image" src="https://github.com/user-attachments/assets/f9a5901b-7337-4f21-91fd-14da1c559df4" />

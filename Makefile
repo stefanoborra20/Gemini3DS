@@ -201,6 +201,7 @@ all: $(OUTPUT).3dsx $(OUTPUT).cia
 $(OUTPUT).3dsx	:	$(OUTPUT).elf $(_3DSXDEPS)
 
 $(OUTPUT).cia	:	$(OUTPUT).elf $(_3DSXDEPS)
+	$(SILENTMSG) built ... $(notdir $@)
 	@makerom -f cia -target t -desc app:4 -DAPP_ROMFS="$(TOPDIR)/romfs" -o $@ -elf $< -icon $(OUTPUT).smdh -rsf $(TOPDIR)/Gemini3DS.rsf
 
 $(OFILES_SOURCES) : $(HFILES)

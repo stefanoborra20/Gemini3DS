@@ -58,6 +58,13 @@ static float maxScrollY;
 static bool wasTalkHeld = false;
 static bool talkTouchActive = false;
 static int recFrame = 0;
+static int animFrame = 0;
+static volatile bool netRetrying = false;
+
+static void Status_Retry(const char *message) {
+    (void)message;
+    netRetrying = true;
+}
 
 void GeminiApp_Init() {
     snprintf(responseText, MAX_RESPONSE_LEN,
@@ -70,8 +77,10 @@ void GeminiApp_Init() {
     wasTalkHeld = false;
     talkTouchActive = false;
     recFrame = 0;
+    animFrame = 0;
+    netRetrying = false;
 
-    Net_SetStatusCallback(ForceDrawStatus);
+    Net_SetStatusCallback(Status_Retry);
 }
 
 void GeminiApp_Exit() {
@@ -82,24 +91,36 @@ void GeminiApp_Exit() {
  * Status screens
  * ---------------------------------------------------------------------- */
 
-static void Draw_WorkingScreen(const char *message) {
-    if (!message || !*message) message = "://WORKING";
+/* Retro LED chase: one lit cell slides along a row of dim cells. */
+static void Draw_Loader(float centerX, float y, int cells, float cell, float gap,
+                        int phase) {
+    float total = cells * cell + (cells - 1) * gap;
+    float x = centerX - total * 0.5f;
+    int active = (animFrame / 6 + phase) % cells;
+    Color lit = netRetrying ? COLOR_ALERT : COLOR_ACCENT;
+
+    for (int i = 0; i < cells; i++) {
+        R_DrawRectSolid(x + i * (cell + gap), y, 0.5f, cell, cell,
+                        i == active ? lit : COLOR_BORDER);
+    }
+}
+
+static void Draw_WorkingScreen(void) {
+    animFrame++;
 
     /* Top screen */
     R_SetTarget(SCREEN_TOP);
     R_ClearScreen(SCREEN_TOP, COLOR_BACKGROUND);
 
-    R_DrawIcon(SCREEN_TOP_WIDTH / 2 - 10.0f, 58.0f, 20.0f,
-               ICON_SPARKLE, COLOR_ACCENT);
-    R_DrawTextCentered(0.0f, 104.0f, SCREEN_TOP_WIDTH, 0.7f,
-                       message, COLOR_TEXT_HIGHLIGHT);
+    R_DrawIcon(SCREEN_TOP_WIDTH / 2 - 10.0f, 54.0f, 20.0f,
+               ICON_SPARKLE, netRetrying ? COLOR_ALERT : COLOR_ACCENT);
+    Draw_Loader(SCREEN_TOP_WIDTH / 2, 104.0f, 7, 10.0f, 4.0f, 0);
 
     /* Bottom screen */
     R_SetTarget(SCREEN_BOTTOM);
     R_ClearScreen(SCREEN_BOTTOM, COLOR_BACKGROUND);
 
-    R_DrawTextCentered(0.0f, 110.0f, SCREEN_BOTTOM_WIDTH, 0.5f,
-                       "PLEASE WAIT", COLOR_TEXT_DIM);
+    Draw_Loader(SCREEN_BOTTOM_WIDTH / 2, 116.0f, 5, 7.0f, 3.0f, 2);
 }
 
 static void Draw_RecordingScreen(void) {
@@ -140,16 +161,87 @@ static void Draw_RecordingScreen(void) {
 }
 
 void ForceDrawStatus(const char *message) {
+    (void)message;
+
     R_BeginFrame();
 
     if (Mic_IsRecording()) {
         Draw_RecordingScreen();
     } else {
-        Draw_WorkingScreen(message);
+        Draw_WorkingScreen();
     }
 
     R_EndFrame();
     gspWaitForVBlank();
+}
+
+/* -------------------------------------------------------------------------
+ * Background network query
+ * Runs the blocking request on a worker thread so the loader keeps moving.
+ * ---------------------------------------------------------------------- */
+
+typedef enum {
+    QUERY_TEXT,
+    QUERY_AUDIO,
+    QUERY_IMAGE
+} QueryKind;
+
+typedef struct {
+    QueryKind kind;
+    const char *prompt;
+    const u8 *data;
+    size_t size;
+    char *out;
+    size_t outSize;
+} QueryJob;
+
+static volatile bool queryDone = false;
+static QueryJob queryJob;
+
+static void Query_Thread(void *arg) {
+    QueryJob *job = (QueryJob *)arg;
+
+    switch (job->kind) {
+        case QUERY_AUDIO:
+            Net_QueryGeminiAudio(job->prompt, (u8 *)job->data, (u32)job->size,
+                                 job->out, job->outSize);
+            break;
+        case QUERY_IMAGE:
+            Net_QueryGeminiImage(job->prompt, (u8 *)job->data, job->size,
+                                 job->out, job->outSize);
+            break;
+        case QUERY_TEXT:
+        default:
+            Net_QueryGemini(job->prompt, job->out, job->outSize);
+            break;
+    }
+
+    queryDone = true;
+}
+
+static void Run_Query(QueryKind kind, const char *prompt, const u8 *data, size_t size) {
+    queryJob.kind = kind;
+    queryJob.prompt = prompt;
+    queryJob.data = data;
+    queryJob.size = size;
+    queryJob.out = responseText;
+    queryJob.outSize = MAX_RESPONSE_LEN;
+
+    queryDone = false;
+    netRetrying = false;
+
+    Thread thread = threadCreate(Query_Thread, &queryJob, 0x10000, 0x3F, -2, false);
+    if (!thread) {
+        Query_Thread(&queryJob);
+        return;
+    }
+
+    while (!queryDone) {
+        ForceDrawStatus(NULL);
+    }
+
+    threadJoin(thread, U64_MAX);
+    threadFree(thread);
 }
 
 /* -------------------------------------------------------------------------
@@ -189,7 +281,7 @@ static void Handle_CameraState(u32 kDown, CamMode cam_mode, bool touchDown,
 
         if (use) {
             isThinking = true;
-            ForceDrawStatus("://CONVERTING JPEG");
+            ForceDrawStatus(NULL);
 
             size_t jpegSize = 0;
             u8 *jpegBuffer = Encode_JPEG(Cam_GetBuffer(), 400, 240, 80, &jpegSize);
@@ -205,14 +297,12 @@ static void Handle_CameraState(u32 kDown, CamMode cam_mode, bool touchDown,
                     }
 
                     isThinking = true;
-                    ForceDrawStatus("://SENDING IMAGE");
 
                     const char *finalPrompt = (strlen(promptBuffer) > 0)
                                                   ? promptBuffer
                                                   : "Describe this photo made from my Nintendo 3DS.";
 
-                    Net_QueryGeminiImage(finalPrompt, jpegBuffer, jpegSize,
-                                         responseText, MAX_RESPONSE_LEN);
+                    Run_Query(QUERY_IMAGE, finalPrompt, jpegBuffer, jpegSize);
                     R_ClearText(responseText);
                     scrollY = 0.0f;
                     isThinking = false;
@@ -262,9 +352,8 @@ static void Handle_TextPrompt(bool pressed) {
         snprintf(lastPrompt, sizeof(lastPrompt), "%s", promptBuffer);
 
         isThinking = true;
-        ForceDrawStatus("://THINKING");
 
-        Net_QueryGemini(promptBuffer, responseText, MAX_RESPONSE_LEN);
+        Run_Query(QUERY_TEXT, promptBuffer, NULL, 0);
         R_ClearText(responseText);
         scrollY = 0.0f;
         isThinking = false;
@@ -292,7 +381,6 @@ static void Handle_AudioPrompt(bool held, bool up) {
         snprintf(lastPrompt, sizeof(lastPrompt), "[VOICE]");
 
         isThinking = true;
-        ForceDrawStatus("://SENDING AUDIO");
 
         const char *voicePrompt =
             "Roleplay as a helpful voice assistant on a Nintendo 3DS. "
@@ -300,8 +388,7 @@ static void Handle_AudioPrompt(bool held, bool up) {
             "Do not describe the audio. Do not transcribe what was said. "
             "Listen to the audio and reply directly and naturally to the user.";
 
-        Net_QueryGeminiAudio(voicePrompt, Mic_GetWavBuffer(), Mic_GetWavSize(),
-                             responseText, MAX_RESPONSE_LEN);
+        Run_Query(QUERY_AUDIO, voicePrompt, Mic_GetWavBuffer(), Mic_GetWavSize());
         R_ClearText(responseText);
         scrollY = 0.0f;
         isThinking = false;
